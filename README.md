@@ -2,210 +2,146 @@
 
 ## Project Overview
 
-Credit risk assessment is one of the most important tasks performed by financial institutions. Every lending decision involves uncertainty, and approving loans for customers who are unlikely to repay them can lead to significant financial losses. At the same time, rejecting customers who are capable of repaying their loans reduces business opportunities and financial inclusion.
+Credit risk assessment is one of the most important tasks performed by financial institutions. Every lending decision involves uncertainty - approving loans for customers who are unlikely to repay them can lead to significant financial losses, while rejecting customers who are capable of repaying reduces business opportunities and financial inclusion.
 
-The objective of this project is to develop a machine learning model that predicts whether a customer is likely to default on a loan using the Home Credit Default Risk dataset. The model combines customer demographic information with historical financial behaviour collected from multiple data sources to improve the accuracy of credit risk assessment.
+In this project, I set out to build a machine learning model that predicts whether a customer is likely to default on a loan, using the Home Credit Default Risk dataset. I combined customer demographic information with historical financial behaviour collected from multiple data sources to improve the accuracy of credit risk assessment.
 
-Rather than relying on traditional rule-based credit scoring, this project applies machine learning techniques to identify complex relationships between customer characteristics and repayment behaviour. The resulting model can support financial institutions in making more informed lending decisions while reducing the risk associated with loan defaults.
+Rather than relying on traditional rule-based credit scoring, I applied machine learning techniques to uncover the more complex relationships between customer characteristics and repayment behaviour. I split the work into four notebooks that mirror the natural stages of the project — data loading, exploratory data analysis, feature engineering, and model selection/training - so each stage could be developed, checked, and re-run independently.
 
-# Business Problem
+## Business Problem
 
-Financial institutions receive thousands of loan applications from customers with different financial backgrounds and repayment histories. Determining which applicants are likely to repay their loans is a challenging task, especially when customer information comes from multiple data sources.
+Financial institutions receive thousands of loan applications from customers with very different financial backgrounds and repayment histories. Figuring out which applicants are likely to repay is a genuinely hard problem, especially once customer information is scattered across multiple data sources.
 
-The Home Credit Default Risk dataset contains customer application information together with credit bureau records, previous loan applications, installment payment history, POS/Cash loan history, and credit card balances. These datasets provide valuable information about a customer's financial behaviour but require extensive preprocessing before they can be used for predictive modelling.
+The Home Credit Default Risk dataset gave me customer application information alongside credit bureau records, previous loan applications, installment payment history, POS/Cash loan history, and credit card balances. These sources hold a lot of valuable signal about a customer's financial behaviour, but they needed extensive preprocessing before I could use them for modelling.
 
-The goal of this project is therefore to build a classification model capable of estimating the probability that a customer will default on a loan, enabling lenders to make more accurate, data-driven credit decisions.
+My goal was to build a classification model capable of estimating the probability that a customer will default, so that lenders can make more accurate, data-driven credit decisions.
 
-# Dataset Description
+## Dataset Description
 
-The project uses the Home Credit Default Risk dataset.
+I worked with the [Home Credit Default Risk](https://www.kaggle.com/c/home-credit-default-risk) dataset, published on Kaggle in 2018 by Home Credit Group, a consumer lender that serves largely unbanked and underbanked populations. The competition challenged participants to predict how capable each applicant is of repaying a loan, using their current application together with previous credit and repayment history. Since I ran into account verification issues with the Kaggle API, I downloaded the data from a Hugging Face mirror of the competition instead, which preserved the same structure and features as the original.
 
-The data consists of one primary application dataset together with several secondary relational datasets containing customer financial history.
+I pulled down 8 tables in total:
 
-The secondary datasets include:
+- `application_train` / `application_test` - the primary applicant-level data
+- `bureau` - an applicant's past loans at other credit institutions
+- `bureau_balance` - monthly status history for those bureau loans (~27 million rows, the largest table in the project)
+- `previous_application` - an applicant's previous loan applications with Home Credit itself
+- `POS_CASH_balance` - monthly balance history on POS/cash loans
+- `credit_card_balance` - monthly credit card account history
+- `installments_payments` - the detailed record of every installment payment made
 
-* Bureau credit history
-* Bureau monthly loan balance
-* Previous loan applications
-* Credit card balance history
-* POS/Cash loan balance history
-* Installment payment history
+Since customers can appear many times in the five secondary tables (once per past loan, once per month of history, and so on), I aggregated each of these down to one row per applicant before merging everything onto the main application table. Before I began the aggregation, I ran two sanity checks: confirming all 8 files were present and that the `TARGET` column existed, then counting the rows in each file so I understood how much work each table would need.
 
-Since each customer may appear multiple times in the secondary datasets, these records were aggregated into customer-level features before being merged with the main application dataset. This produced a single modelling dataset containing one record per applicant.
+## Notebook 1 - Data Loading & Aggregation
 
-# Exploratory Data Analysis (EDA)
+This is where I turned eight raw, messy tables into a single modelling-ready file.
 
-Exploratory Data Analysis was conducted to understand the structure, quality and characteristics of the data before any preprocessing or modelling.
+**Downcasting for memory.** Because some of these tables are enormous (`bureau_balance` alone has ~27 million rows), I wrote a `downcast()` helper that shrinks each column to the smallest dtype that can hold it without losing information — float64 becomes float32, oversized integer types get trimmed down, and so on. I used this throughout the pipeline to keep memory usage manageable.
 
-Several important observations were made during this stage.
+**Aggregating the five secondary tables.** For each table, I one-hot encoded the categorical columns and grouped by the applicant (or loan) ID, computing summary statistics - mean, sum, min, max, and count - that describe each customer's history:
 
-### Class Imbalance
+- `bureau_balance` first gets aggregated up to one row per `SK_ID_BUREAU`, since it's keyed at the loan level, not the applicant level.
+- `bureau` then folds in those `bureau_balance` summaries and gets aggregated again, this time down to one row per `SK_ID_CURR`.
+- `POS_CASH_balance` already carries `SK_ID_CURR` directly, so I aggregated it straight to one row per applicant, capturing things like average/maximum installments remaining and the share of loans in each contract status.
+- `credit_card_balance` gets the same treatment — average, maximum, and total balances, payments, withdrawals, and receivables per applicant.
+- `previous_application` needed one extra cleaning step first: the value `365243` is used as a placeholder for "no date available" in several date columns, so I replaced it with `NaN` before aggregating, otherwise it would have distorted every average I computed from those columns.
+- `installments_payments` got two new features before aggregation -`DAYS_LATE` (how many days early or late a payment was) and `AMT_PAYMENT_DIFF` (the gap between the expected and actual payment amount) - which let me summarise each applicant's payment discipline, not just their raw payment totals.
 
-The target variable was highly imbalanced.
+**Merging everything together.** With each secondary table reduced to one row per applicant, I left-merged all five onto the main application table and checked the row count after every single merge to make sure nothing was silently duplicated or dropped.
 
-Approximately 92% of customers successfully repaid their loans, while only about 8% defaulted.
+**Aligning train and test.** One-hot encoding can occasionally produce a category in the training set that never shows up in the test set (or vice versa), so I reindexed the test set to match the training set's exact columns, filling any gaps with zero, and asserted the column sets matched before saving.
 
-This imbalance indicated that relying on accuracy alone would produce misleading results. Consequently, ROC-AUC was selected as the primary evaluation metric, and class weighting was incorporated into the machine learning models.
+I saved the results as `train_final.csv` and `test_final.csv` - **307,511 applicants × 568 columns** in training, and **48,744 applicants × 567 columns** in test (the difference being the missing `TARGET` column in test).
 
-### Missing Values
+## Notebook 2 - Exploratory Data Analysis
 
-Many numerical and categorical variables contained substantial missing values.
+Once I had a single modelling file, I spent this notebook getting to know the data properly before touching it with any preprocessing.
 
-The missing values were not random. In several cases, the absence of information represented meaningful customer characteristics rather than poor data quality.
+**Class imbalance.** I confirmed the target was heavily imbalanced - **91.93% of applicants repaid their loans, and 8.07% defaulted**. This shaped almost every decision from here on: I chose ROC-AUC as my primary evaluation metric rather than accuracy, and planned to handle the imbalance directly during model training.
 
-This finding guided the choice of appropriate imputation methods and the creation of missing-value indicator features during feature engineering.
+**Missing values.** I built a `missing_value_report()` function to profile missingness across every column, and the picture was substantial: **513 of 568 features had at least one missing value, and only 55 were complete.** But the missingness wasn't evenly spread - only 6 features were missing more than 90% of their values, 145 features fell between 50-90% missing, and the majority (362 features) were under 50% missing. The features with the worst missingness were mostly aggregated previous-loan interest rate variables, while important predictors like `EXT_SOURCE_2`, `AMT_GOODS_PRICE`, and `AMT_ANNUITY` were almost entirely complete. Crucially, the missingness was concentrated in the `PREV_`, `CC_`, and `BUREAU_` feature groups - meaning a missing value there often just reflects an applicant who never had that kind of previous financial activity, rather than a data quality problem. That insight directly shaped how I imputed things.
 
-### Data Anomalies
+**Handling the missingness.** I split my imputation strategy by what each feature actually represents:
+- Features ending in `_SUM`, `_COUNT`, or `_NUNIQUE` got filled with **0**, since a missing value there usually means "no previous activity" rather than "unknown value."
+- Everything else numeric (financial amounts, ratios, averages) got filled with the **median**, since these variables are heavily skewed and a mean or zero-fill would distort them.
+- For any feature missing more than **70%** of its values, I created a `_WAS_MISSING` binary indicator column before imputing, so the model could still use the fact that the value was absent as a signal in itself. This added 110 new indicator columns.
+- Categorical columns got filled with a new `"Missing"` category rather than being dropped.
 
-Exploratory analysis identified abnormal values in variables such as `DAYS_EMPLOYED`, where an unusually large repeated value represented missing or unavailable employment information rather than actual employment duration.
+After all of this, both datasets had zero remaining missing values.
 
-These anomalies were identified and appropriately handled during preprocessing.
+**Anomaly detection.** I found that `DAYS_EMPLOYED` contained a suspicious repeated value - `365243`, which works out to roughly 1,000 years. This is a known Home Credit placeholder meaning "not currently employed," not a real duration. I created a `DAYS_EMPLOYED_ANOM` flag to preserve that signal, then replaced the placeholder with the median of the genuine values.
 
-### Feature Relationships
+**Outliers.** I ran an IQR-based outlier scan across the numeric columns and visualised the worst offenders (income, credit amount, annuity, goods price) with boxplots. The outliers I found looked like genuine variation in customer circumstances rather than data errors, so I left them in - the tree-based models I planned to use aren't especially sensitive to them anyway.
 
-Correlation analysis showed that most individual variables had relatively weak linear relationships with the target variable.
+**Correlation analysis.** I correlated every numeric feature against `TARGET` and found that no single feature has a strong linear relationship with default — the strongest correlation I found was only **-0.160**, from `EXT_SOURCE_2`. The three external credit score features (`EXT_SOURCE_1/2/3`) were consistently the strongest protective factors, while previous-loan refusals, active bureau accounts, and regional risk ratings showed weak positive relationships with default. This told me default risk is driven by a combination of many weak signals rather than any one strong predictor - which is exactly the kind of pattern non-linear models like Random Forest, XGBoost, and LightGBM are built to capture.
 
-This suggested that loan default prediction depends on complex interactions between multiple features rather than any single variable.
+**Feature distributions & skewness.** Most of the financial variables were positively skewed - `AMT_INCOME_TOTAL` especially so (skewness ≈ 391.6), since a small number of applicants earn far more than the rest. This confirmed median imputation was the right call, and reinforced that tree-based models (which don't assume normally distributed inputs) were a good fit here.
 
-A separate linear separability assessment confirmed that the classes were not perfectly separable using simple linear boundaries, supporting the inclusion of more advanced machine learning algorithms capable of learning non-linear relationships.
+**Constant features.** I checked for columns with only one unique value across the entire dataset - there was just one, and I dropped it since it carried no information.
 
-# Data Cleaning and Preprocessing
+**Linear separability.** I plotted random pairs of features against each other, colouring by default status, to see whether a simple straight-line boundary could separate defaulters from non-defaulters. It couldn't - the classes overlapped substantially across almost every pair I looked at, confirming that this problem needs models capable of learning non-linear interactions.
 
-Several preprocessing techniques were applied to improve data quality and prepare the dataset for machine learning.
+I finished with a final quality check — no missing values, no leftover `365243` placeholders, no infinite values - before saving the cleaned data as `train_clean_eda.parquet` and `test_clean_eda.parquet`.
 
-## Missing Value Treatment
+## Notebook 3 - Feature Engineering
 
-Numerical variables were imputed using the median because it is robust to extreme values and preserves the overall distribution of the data.
+With clean data in hand, I turned to building new features that would give the models more to work with than the raw variables alone.
 
-Categorical variables were imputed using the most frequent category or appropriate missing indicators, allowing the models to retain potentially useful information contained in missing values.
+I created **24 new features** across seven themes:
 
-After preprocessing, no missing values remained in the modelling dataset.
+- **Financial ratios** (`CREDIT_INCOME_RATIO`, `ANNUITY_INCOME_RATIO`, `CREDIT_GOODS_RATIO`, `GOODS_INCOME_RATIO`, and a fifth affordability ratio) - these capture affordability and repayment burden far better than the raw loan and income figures on their own.
+- **Family/household features** (`INCOME_PER_PERSON`, `INCOME_PER_CHILD`, `CREDIT_PER_PERSON`, `CHILDREN_RATIO`) - since income and debt are usually shared across a household, these adjust for family size rather than treating every applicant as a single-income unit.
+- **Age features** (`AGE_YEARS`, `EMPLOYMENT_YEARS`, `REGISTRATION_YEARS`, `ID_PUBLISH_YEARS`) - I converted the raw "days before application" fields into more interpretable years.
+- **Life-stage ratios** (`EMPLOYMENT_AGE_RATIO`, `REGISTRATION_AGE_RATIO`) - comparing employment and registration duration to age, to capture stability relative to an applicant's lifetime rather than in absolute terms.
+- **External credit score aggregates** (`EXT_SOURCE_MEAN`, `MAX`, `MIN`, `STD`, `SUM`) - since the three individual `EXT_SOURCE` columns were already my strongest predictors from the EDA, I combined them into summary statistics to capture an applicant's overall external creditworthiness.
+- **Loan term** (`LOAN_TERM`) - an estimate of how long a loan would take to repay, from credit amount over annuity.
+- **Social risk features** (`TOTAL_SOCIAL_OBS`, `TOTAL_SOCIAL_DEF`) - combining the 30-day and 60-day social circle observation/default counts into single measures.
+- **Contact accessibility** (`TOTAL_CONTACT_FLAGS`) - summing up the six individual contact-method flags into one count.
 
-## Feature Engineering
+I validated every new feature for missing values, infinite values (a real risk with ratio features when the denominator is zero), and reasonable distributions before moving on. When I checked their correlation with `TARGET`, the engineered `EXT_SOURCE_SUM` and `EXT_SOURCE_MEAN` features came out on top at **-0.221** - stronger than any of the three original `EXT_SOURCE` columns individually, which was a nice confirmation that the engineering was adding real value rather than just noise.
 
-The Home Credit dataset consists of multiple related tables containing repeated observations for each customer.
+After a final quality check, I saved the result as `train_feature_engineered.parquet` and `test_feature_engineered.parquet` -**307,511 rows × 702 columns** for training.
 
-To create a single modelling dataset, these records were aggregated using statistical measures such as:
+## Notebook 4 - Model Selection & Training
 
-* Mean
-* Maximum
-* Minimum
-* Sum
-* Count
+This is where everything comes together into trained, evaluated models.
 
-These engineered variables summarised each customer's historical financial behaviour, previous borrowing patterns, repayment history and credit utilisation.
+**Cardinality check & encoding.** I profiled the number of unique categories in each categorical feature. Most were low-cardinality (2–19 categories), but `ORGANIZATION_TYPE` had 58, so I kept the 15 most frequent categories and grouped everything else into `"Other"` before one-hot encoding, to avoid creating dozens of rarely-used dummy columns. I one-hot encoded the remaining categorical columns with `pd.get_dummies()` and aligned train/test to guarantee identical columns. Since LightGBM doesn't tolerate certain special characters in feature names (which one-hot encoding introduces), I also ran a column-name cleaning step across both datasets.
 
-Feature engineering substantially increased the amount of predictive information available for model training.
+**Train/validation split.** I split the training data 80/20 using a stratified split on `TARGET`, so both sets preserved the original 92/8 class balance — 246,008 rows for training and 61,503 for validation.
 
-## Encoding
+**Handling class imbalance with SMOTE.** Rather than relying on class weighting alone, I applied SMOTE (Synthetic Minority Oversampling Technique) to the *training* set only, generating synthetic examples of the minority (default) class. I made sure to apply SMOTE after the train/validation split, so no synthetic information could leak into the validation set and inflate my scores artificially.
 
-Machine learning algorithms require numerical input.
+**Scaling.** I standardised the features with `StandardScaler`, but only for Logistic Regression, since it's the one model in this line-up that's sensitive to feature magnitude — the tree-based models don't need it.
 
-Categorical variables were therefore converted into numerical variables using one-hot encoding.
+**Model training & comparison.** I trained five models on the SMOTE-balanced training data and evaluated all of them on the untouched validation set using accuracy, precision, recall, F1-score, and ROC-AUC:
 
-This approach preserves all category information while avoiding artificial ordering between categories.
+| Model | ROC-AUC | Accuracy | Precision | Recall | F1-score |
+|---|---:|---:|---:|---:|---:|
+| **LightGBM** | **0.780** | 0.920 | 0.565 | 0.023 | 0.044 |
+| Logistic Regression | 0.777 | 0.920 | 0.546 | 0.036 | 0.067 |
+| XGBoost | 0.773 | 0.919 | 0.477 | 0.061 | 0.108 |
+| Random Forest | 0.736 | 0.919 | 0.514 | 0.004 | 0.007 |
+| Decision Tree | 0.544 | 0.845 | 0.143 | 0.185 | 0.161 |
 
-## Duplicate Feature Removal
+LightGBM came out on top, with Logistic Regression a close second — a good sign that my engineered features carried enough signal that even a simple linear model could compete with the ensemble methods. What stood out to me, though, is that despite the strong accuracy numbers (~92% across the top three models), recall was consistently low. Because defaults are the minority class, the models are still much better at recognising repayers than at flagging the customers who will actually default, which is the group that matters most for a lender. This is the trade-off I'd want to tune further with a probability threshold adjustment, rather than relying on the default 0.5 cutoff.
 
-Following feature engineering and encoding, duplicate feature detection was performed.
+**Hyperparameter tuning.** Since LightGBM came out ahead, I focused my tuning effort there, using `RandomizedSearchCV` over `n_estimators`, `learning_rate`, `num_leaves`, `max_depth`, `min_child_samples`, `subsample`, and `colsample_bytree`, optimising for ROC-AUC. The baseline LightGBM score of 0.780 was my benchmark going in — tuning gave me a chance to push that further while keeping the model's complexity, and overfitting risk, in check.
 
-Candidate duplicate columns were first identified using sampled fingerprints before being verified against the complete dataset.
+## Technologies Used
 
-Only columns that were confirmed to contain identical information across the full dataset were removed.
+- Python
+- Pandas, NumPy
+- Scikit-learn
+- XGBoost, LightGBM
+- imbalanced-learn (SMOTE)
+- Matplotlib, Seaborn
+- Hugging Face `datasets` (for sourcing the data)
 
-Removing duplicate features reduced redundancy without losing predictive information.
+## Conclusion
 
-## Feature Scaling
+Across these four notebooks, I took eight raw, relational tables and turned them into a single, clean, feature-rich dataset capable of predicting loan default. Along the way, I learned that missingness in this dataset is informative rather than random, that no single feature can separate defaulters from non-defaulters on its own, and that the engineered `EXT_SOURCE` aggregates outperformed any of the original external credit score columns individually.
 
-Numerical variables were standardised using StandardScaler.
+LightGBM emerged as my strongest model with a ROC-AUC of 0.780, closely followed by Logistic Regression, which reinforced just how much of the predictive power came from the feature engineering rather than model complexity alone. The next step in this project is to push further on hyperparameter tuning, explore threshold adjustment to improve recall on the minority class, and finalise a single production-ready model to generate loan default predictions.
 
-Scaling ensures that variables measured on different scales contribute equally to algorithms that are sensitive to feature magnitude, such as Logistic Regression.
-
-## Correlation-Based Feature Selection
-
-Highly correlated variables were identified using a correlation threshold of 0.90.
-
-For each correlated pair, the feature with the stronger relationship to the target variable was retained while the weaker feature was removed.
-
-This reduced multicollinearity, simplified the dataset and improved model efficiency.
-
-The feature space was reduced from 659 features to 510 features without removing useful predictive information.
-
-# Model Development
-
-The processed dataset was divided into training and validation datasets using an 80:20 stratified split.
-
-Stratified sampling ensured that both datasets preserved the original distribution of the target classes despite the class imbalance.
-
-Several supervised machine learning algorithms were evaluated.
-
-## Logistic Regression
-
-Logistic Regression was used as the baseline model because it is simple, computationally efficient and highly interpretable. It provides an important benchmark against which more advanced machine learning models can be compared.
-
-## Decision Tree
-
-Decision Trees were included because they capture non-linear relationships between variables while producing interpretable decision rules.
-
-## Random Forest
-
-Random Forest was selected because it combines multiple decision trees to improve predictive performance and reduce overfitting through ensemble learning.
-
-## XGBoost
-
-XGBoost was chosen because gradient boosting algorithms consistently achieve excellent performance on structured tabular datasets. It is capable of modelling complex feature interactions while maintaining strong predictive accuracy.
-
-## CatBoost
-
-CatBoost was included because it performs well on structured datasets containing categorical information and often requires relatively little parameter tuning.
-
-## LightGBM
-
-LightGBM was evaluated separately because it does not support feature names containing certain special characters introduced during one-hot encoding.
-
-The feature names were therefore cleaned before training the model. This preprocessing step affected only the feature names and did not modify the underlying data.
-
-
-# Feature Selection Strategy
-
-Feature selection was performed to reduce redundancy and improve model efficiency while retaining the most informative predictors.
-
-The first stage involved removing duplicate features created during feature engineering and encoding.
-
-The second stage removed highly correlated variables while retaining the feature with the stronger relationship to the target variable.
-
-# Model Evaluation
-
-Each machine learning model was evaluated using multiple classification metrics.
-
-* Accuracy
-* Precision
-* Recall
-* F1-score
-* ROC-AUC
-* PR-AUC
-
-Because the dataset is highly imbalanced, ROC-AUC was selected as the primary evaluation metric. It provides a more reliable measure of a model's ability to distinguish between customers who are likely to default and those who are likely to repay their loans.
-
-The baseline Logistic Regression model achieved a ROC-AUC score of approximately 0.77, providing a strong benchmark for comparison with the remaining machine learning algorithms.
-
-# Technologies Used
-
-* Python
-* Pandas
-* NumPy
-* Scikit-learn
-* XGBoost
-* LightGBM
-* CatBoost
-* Matplotlib
-* Seaborn
-
-# Conclusion
-
-This project demonstrates how machine learning can improve credit risk assessment by combining customer demographic information with historical financial behaviour collected from multiple financial sources.
-
-Through comprehensive exploratory data analysis, feature engineering, data cleaning, feature selection and model comparison, the project develops predictive models capable of estimating the probability of customer loan default.
-
-The final stage of the project focuses on selecting the best-performing model through comprehensive model comparison and hyperparameter tuning before generating the final loan default predictions. The resulting model aims to support more accurate lending decisions, reduce financial risk and improve the overall effectiveness of credit risk management.
 
