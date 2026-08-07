@@ -81,7 +81,7 @@ After all of this, both datasets had zero remaining missing values.
 
 **Linear separability.** I plotted random pairs of features against each other, colouring by default status, to see whether a simple straight-line boundary could separate defaulters from non-defaulters. It couldn't - the classes overlapped substantially across almost every pair I looked at, confirming that this problem needs models capable of learning non-linear interactions.
 
-I finished with a final quality check — no missing values, no leftover `365243` placeholders, no infinite values - before saving the cleaned data as `train_clean_eda.parquet` and `test_clean_eda.parquet`.
+I finished with a final quality check - no missing values, no leftover `365243` placeholders, no infinite values - before saving the cleaned data as `train_clean_eda.parquet` and `test_clean_eda.parquet`.
 
 ## Notebook 3 - Feature Engineering
 
@@ -108,11 +108,11 @@ This is where everything comes together into trained, evaluated models.
 
 **Cardinality check & encoding.** I profiled the number of unique categories in each categorical feature. Most were low-cardinality (2–19 categories), but `ORGANIZATION_TYPE` had 58, so I kept the 15 most frequent categories and grouped everything else into `"Other"` before one-hot encoding, to avoid creating dozens of rarely-used dummy columns. I one-hot encoded the remaining categorical columns with `pd.get_dummies()` and aligned train/test to guarantee identical columns. Since LightGBM doesn't tolerate certain special characters in feature names (which one-hot encoding introduces), I also ran a column-name cleaning step across both datasets.
 
-**Train/validation split.** I split the training data 80/20 using a stratified split on `TARGET`, so both sets preserved the original 92/8 class balance — 246,008 rows for training and 61,503 for validation.
+**Train/validation split.** I split the training data 80/20 using a stratified split on `TARGET`, so both sets preserved the original 92/8 class balance - 246,008 rows for training and 61,503 for validation.
 
 **Handling class imbalance with SMOTE.** Rather than relying on class weighting alone, I applied SMOTE (Synthetic Minority Oversampling Technique) to the *training* set only, generating synthetic examples of the minority (default) class. I made sure to apply SMOTE after the train/validation split, so no synthetic information could leak into the validation set and inflate my scores artificially.
 
-**Scaling.** I standardised the features with `StandardScaler`, but only for Logistic Regression, since it's the one model in this line-up that's sensitive to feature magnitude — the tree-based models don't need it.
+**Scaling.** I standardised the features with `StandardScaler`, but only for Logistic Regression, since it's the one model in this line-up that's sensitive to feature magnitude - the tree-based models don't need it.
 
 **Model training & comparison.** I trained five models on the SMOTE-balanced training data and evaluated all of them on the untouched validation set using accuracy, precision, recall, F1-score, and ROC-AUC:
 
