@@ -178,12 +178,7 @@ The final notebook reloads the saved model package into a clean environment, reb
 
 Accuracy is not the headline metric here - the dataset is imbalanced, so the Defaulter row matters far more. The model catches **65% of real defaulters** (recall), which is the key win over the baseline models that caught essentially none. The trade-off is precision of only 20%: most customers flagged as high-risk are actually safe, which is the direct cost of prioritising recall through class weighting.
 
-<img width="533" height="470" alt="image" src="https://github.com/user-attachments/assets/8386bfbb-6041-4f7a-9e4b-24de8083981a" />
-
-
-<p align="center">
-  <img src="assets/confusion_matrix.png" width="480"><br>
-  <em>At the 0.50 threshold: 43,387 true negatives, 13,151 false positives, 1,733 false negatives, 3,232 true positives.</em>
+<img width="533" height="470" alt="image" src="https://github.com/user-attachments/assets/8386bfbb-6041-4f7a-9e4b-24de8083981a" /> At the 0.50 threshold: 43,387 true negatives, 13,151 false positives, 1,733 false negatives, 3,232 true positives.</em>
 </p>
 
 <p align="center">
@@ -196,22 +191,18 @@ Accuracy is not the headline metric here - the dataset is imbalanced, so the Def
 
 Ranking ability (ROC-AUC) is not the same as trustworthy probabilities. A calibration curve and Brier score check whether a predicted 70% default probability actually corresponds to a ~70% real-world default rate.
 
-<p align="center">
-  <img src="assets/calibration_curve.png" width="480"><br>
-  <em>Brier Score = 0.1642. The model's probabilities run consistently higher than the true default rate at every bin — a known side effect of class weighting, which optimises ranking rather than calibration.</em>
+<img width="614" height="623" alt="image" src="https://github.com/user-attachments/assets/4b403152-a031-4131-8610-e69f59004176" />
+<em>Brier Score = 0.1642. The model's probabilities run consistently higher than the true default rate at every bin — a known side effect of class weighting, which optimises ranking rather than calibration.</em>
 </p>
 
 This means the model's raw probability outputs should **not** be read as literal default likelihoods. If this model is ever used for anything beyond a binary approve/decline decision (e.g. risk-based pricing), the probabilities should be recalibrated first (e.g. `CalibratedClassifierCV` with Platt scaling or isotonic regression).
 
 ### Error Analysis
 
-Comparing correctly classified vs. misclassified applicants showed the largest gap was in the model's own predicted probability — correct predictions clustered confidently, while misclassifications sat much closer to the 0.50 decision boundary, meaning most of the model's errors are borderline cases rather than confident failures.
+Comparing correctly classified vs. misclassified applicants showed the largest gap was in the model's own predicted probability - correct predictions clustered confidently, while misclassifications sat much closer to the 0.50 decision boundary, meaning most of the model's errors are borderline cases rather than confident failures.
 
-<p align="center">
-  <img src="assets/age_distribution.png" width="560"><br>
-  <em>Misclassifications are noticeably concentrated among younger applicants (peaking around 28-35), while the model is consistently more reliable for applicants over 55 - likely reflecting thinner credit and employment histories for younger customers.</em>
-</p>
-
+<img width="709" height="469" alt="image" src="https://github.com/user-attachments/assets/1f204b83-6f81-4b56-923a-f1b870680294" />
+<em>Misclassifications are noticeably concentrated among younger applicants (peaking around 28-35), while the model is consistently more reliable for applicants over 55 - likely reflecting thinner credit and employment histories for younger customers.
 **A closer look at the errors.** Splitting the 13,151 false positives and 1,733 false negatives out and comparing their predicted probabilities directly confirms the borderline-errors story:
 
 | | False Positives (n=13,151) | False Negatives (n=1,733) |
@@ -220,8 +211,8 @@ Comparing correctly classified vs. misclassified applicants showed the largest g
 | Min | 0.5000 | 0.0471 |
 | Max | 0.9032 | 0.4997 |
 
-<p align="center">
-  <img src="assets/fp_fn_probability_distribution.png" width="560"><br>
+<img width="851" height="546" alt="image" src="https://github.com/user-attachments/assets/84e37a78-c8e0-46cc-9a1c-eba518574c71" />
+
   <em>False positives cluster just above the 0.50 threshold and thin out quickly; false negatives cluster just below it. Very few errors sit at the extremes - the model is rarely confidently wrong, it's mostly wrong at the margin.</em>
 </p>
 
@@ -229,28 +220,25 @@ False positives (13,151) outnumber false negatives (1,733) by roughly 7.6 to 1 -
 
 ### Feature Importance & SHAP
 
-<p align="center">
-  <img src="assets/feature_importance.png" width="560"><br>
-  <em>Built-in LightGBM importance: LOAN_TERM, EXT_SOURCE_MEAN, PREV_DAYS_LAST_DUE_1ST_VERSION_MAX, AMT_ANNUITY, and ANNUITY_CREDIT_RATIO are the top five drivers - the engineered ratio and external-score features are pulling real weight alongside the raw application fields.</em>
+<img width="1129" height="546" alt="image" src="https://github.com/user-attachments/assets/5b70390b-4911-4c70-a88b-e6d540bc9640" />
+ <em>Built-in LightGBM importance: LOAN_TERM, EXT_SOURCE_MEAN, PREV_DAYS_LAST_DUE_1ST_VERSION_MAX, AMT_ANNUITY, and ANNUITY_CREDIT_RATIO are the top five drivers - the engineered ratio and external-score features are pulling real weight alongside the raw application fields.</em>
 </p>
 
 Because raw importance doesn't show direction or explain individual decisions, SHAP adds a global summary of feature impact and direction, plus individual force-plot explanations for one concrete false-negative and one false-positive case, in the style of a reason code a credit risk team could review for a specific declined or flagged applicant.
 
-<p align="center">
-  <img src="assets/shap_summary.png" width="560"><br>
-  <em>Low EXT_SOURCE_MEAN (blue, left side) consistently pushes predictions toward default; high EXT_SOURCE_MEAN (red) pushes away from it — the model's strongest signal behaves in an intuitive, explainable direction.</em>
+<img width="866" height="940" alt="image" src="https://github.com/user-attachments/assets/7bdf7723-a17d-46d2-87ef-399f9a6cabd2" />
+
+<em>Low EXT_SOURCE_MEAN (blue, left side) consistently pushes predictions toward default; high EXT_SOURCE_MEAN (red) pushes away from it - the model's strongest signal behaves in an intuitive, explainable direction.</em>
 </p>
 
 **Individual reason codes.** Beyond the global picture, SHAP force plots explain single predictions - the format a credit officer would actually review for one applicant:
 
-<p align="center">
-  <img src="assets/shap_false_negative.png" width="700"><br>
-  <em>A false negative (actual defaulter predicted safe): a low PREV_NAME_CONTRACT_STATUS_REFUSED_MEAN and a mid-range EXT_SOURCE_MEAN both pushed the prediction toward "safe," outweighing whatever risk signal was present elsewhere.</em>
+<img width="1969" height="259" alt="image" src="https://github.com/user-attachments/assets/47ab25e1-30ab-40eb-a30e-0770a6f0936e" />
+ <em>A false negative (actual defaulter predicted safe): a low PREV_NAME_CONTRACT_STATUS_REFUSED_MEAN and a mid-range EXT_SOURCE_MEAN both pushed the prediction toward "safe," outweighing whatever risk signal was present elsewhere.</em>
 </p>
 
-<p align="center">
-  <img src="assets/shap_false_positive.png" width="700"><br>
-  <em>A false positive (safe applicant predicted as a defaulter), with the specific features that pushed the model's decision in that direction.</em>
+<img width="1939" height="259" alt="image" src="https://github.com/user-attachments/assets/cf900cf6-7e03-4116-b65f-c1b844fd77ef" />
+<em>A false positive (safe applicant predicted as a defaulter), with the specific features that pushed the model's decision in that direction.</em>
 </p>
 
 ### Fairness Check
@@ -265,14 +253,13 @@ I checked defaulter recall (the model's ability to catch actual defaulters) acro
 | 50-59 | 13,612 | 867 | 54.9% | 45.1% |
 | 60+ | 7,258 | 360 | 43.1% | 56.9% |
 
-<p align="center">
-  <img src="assets/fairness_age_recall.png" width="560"><br>
-  <em>Defaulter recall declines steadily with age — from 76.3% for 18-29 year-olds down to 43.1% for applicants 60+. The model is noticeably worse at catching defaults among older applicants.</em>
+<img width="790" height="490" alt="image" src="https://github.com/user-attachments/assets/0638802c-cfa6-4a49-a385-61e1f6418a4c" />
+ <em>Defaulter recall declines steadily with age - from 76.3% for 18-29 year-olds down to 43.1% for applicants 60+. The model is noticeably worse at catching defaults among older applicants.</em>
 </p>
 
 The age-recall gap doesn't invalidate the model, but it flags a real area needing attention (e.g. age-group-specific threshold review or additional fairness-aware training) before any real-world deployment.
 
-> **Note on the gender breakdown:** the equivalent by-gender fairness cell in the current notebook returned an **empty result table**, not real numbers — while the age-based cell right next to it, running the identical logic, worked correctly. That points to a stale-kernel / out-of-order execution issue specific to that cell rather than a real absence of defaulters in any gender group. **Restart & Run All** and re-check it before trusting any gender-based figures. Earlier drafts of this project cited a female-vs-male recall gap (65.3% vs 78.3%), but since that couldn't be reproduced from the current run's actual output, I've left it out here rather than restate unverified numbers — treat that specific claim as unconfirmed until the cell is fixed and re-run.
+> **Note on the gender breakdown:** the equivalent by-gender fairness cell in the current notebook returned an **empty result table**, not real numbers - while the age-based cell right next to it, running the identical logic, worked correctly. That points to a stale-kernel / out-of-order execution issue specific to that cell rather than a real absence of defaulters in any gender group. **Restart & Run All** and re-check it before trusting any gender-based figures. Earlier drafts of this project cited a female-vs-male recall gap (65.3% vs 78.3%), but since that couldn't be reproduced from the current run's actual output, I've left it out here rather than restate unverified numbers - treat that specific claim as unconfirmed until the cell is fixed and re-run.
 
 ### Final Test-Set Predictions
 
