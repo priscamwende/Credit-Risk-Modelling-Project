@@ -181,9 +181,10 @@ Accuracy is not the headline metric here - the dataset is imbalanced, so the Def
 <img width="533" height="470" alt="image" src="https://github.com/user-attachments/assets/8386bfbb-6041-4f7a-9e4b-24de8083981a" /> At the 0.50 threshold: 43,387 true negatives, 13,151 false positives, 1,733 false negatives, 3,232 true positives.</em>
 </p>
 
-<p align="center">
-  <img src="assets/roc_curve.png" width="480">
-  <img src="assets/pr_curve.png" width="480"><br>
+<img width="614" height="546" alt="image" src="https://github.com/user-attachments/assets/e9a26554-4314-4d91-87ec-a35c69b85fc7" />
+
+<img width="614" height="546" alt="image" src="https://github.com/user-attachments/assets/0dc4ce8d-4cc4-4180-ab59-8b0719999cb4" />
+
   <em>ROC-AUC of 0.780 and Average Precision of 0.274 - both well above the random-guessing baseline, consistent with the earlier baseline comparison.</em>
 </p>
 
