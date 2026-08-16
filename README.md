@@ -85,7 +85,7 @@ After all of this, both datasets had zero remaining missing values.
 
 **Linear separability.** I plotted random pairs of features against each other, colouring by default status, to see whether a simple straight-line boundary could separate defaulters from non-defaulters. It couldn't - the classes overlapped substantially across almost every pair I looked at, confirming that this problem needs models capable of learning non-linear interactions.
 
-I finished with a final quality check — no missing values, no leftover `365243` placeholders, no infinite values - before saving the cleaned data as `train_clean_eda.parquet` and `test_clean_eda.parquet`.
+I finished with a final quality check - no missing values, no leftover `365243` placeholders, no infinite values - before saving the cleaned data as `train_clean_eda.parquet` and `test_clean_eda.parquet`.
 
 ## Notebook 3 - Feature Engineering
 
