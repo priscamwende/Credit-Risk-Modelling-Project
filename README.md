@@ -106,8 +106,6 @@ I validated every new feature for missing values, infinite values (a real risk w
 
 After a final quality check, I saved the result as `train_feature_engineered.parquet` and `test_feature_engineered.parquet` - 307,511 rows × 702 columns for training.
 
----
-
 ## Notebook 4 - Model Selection & Training
 
 This is where everything comes together into a trained, tuned, and saved production model.
@@ -179,6 +177,9 @@ The final notebook reloads the saved model package into a clean environment, reb
 - **Average Precision:** 0.2741
 
 Accuracy is not the headline metric here - the dataset is imbalanced, so the Defaulter row matters far more. The model catches **65% of real defaulters** (recall), which is the key win over the baseline models that caught essentially none. The trade-off is precision of only 20%: most customers flagged as high-risk are actually safe, which is the direct cost of prioritising recall through class weighting.
+
+<img width="533" height="470" alt="image" src="https://github.com/user-attachments/assets/8386bfbb-6041-4f7a-9e4b-24de8083981a" />
+
 
 <p align="center">
   <img src="assets/confusion_matrix.png" width="480"><br>
