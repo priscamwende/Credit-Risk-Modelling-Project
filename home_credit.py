@@ -1,4 +1,7 @@
-import pickle
+
+# CREDIT RISK ASSESSMENT APPLICATION
+
+import joblib
 import re
 from pathlib import Path
 
@@ -8,64 +11,17 @@ import streamlit as st
 import shap
 
 
-# ============================================================
-# PAGE CONFIGURATION
-# ============================================================
+# Page Configuration
+
 
 st.set_page_config(
     page_title="Credit Risk Assessment",
-    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 
-# ============================================================
-# CUSTOM CSS
-# ============================================================
-
-st.markdown(
-    """
-    <style>
-
-    .main {
-        padding-top: 1rem;
-    }
-
-    .block-container {
-        max-width: 1250px;
-        padding-top: 2rem;
-    }
-
-    .metric-card {
-        background-color: #f7f9fc;
-        padding: 20px;
-        border-radius: 12px;
-        border: 1px solid #e6eaf0;
-        text-align: center;
-    }
-
-    .title-text {
-        font-size: 38px;
-        font-weight: 700;
-        margin-bottom: 5px;
-    }
-
-    .subtitle-text {
-        color: #6b7280;
-        font-size: 17px;
-        margin-bottom: 25px;
-    }
-
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-
-# ============================================================
-# COLUMN NAME CLEANING
-# ============================================================
+# Column Name cleaning
 
 def clean_column_names(df):
 
@@ -83,9 +39,8 @@ def clean_column_names(df):
     return df
 
 
-# ============================================================
-# SAFE DIVISION
-# ============================================================
+# Safe Division
+
 
 def safe_divide(a, b):
 
@@ -94,14 +49,11 @@ def safe_divide(a, b):
     )
 
 
-# ============================================================
-# SHAP EXPLAINER
-# ============================================================
+# SHAP Explainer
 
-@st.cache_resource
-def create_shap_explainer(_model):
+def create_shap_explainer(model):
 
-    return shap.TreeExplainer(_model)
+    return shap.TreeExplainer(model)
 
 
 def get_shap_explanation(model, X):
@@ -156,14 +108,11 @@ def get_shap_explanation(model, X):
 
     explanation = pd.DataFrame({
 
-        "Feature":
-            X.columns,
+        "Feature": X.columns,
 
-        "Value":
-            X.iloc[0].values,
+        "Value": X.iloc[0].values,
 
-        "SHAP":
-            values
+        "SHAP": values
 
     })
 
@@ -181,88 +130,105 @@ def get_shap_explanation(model, X):
     )
 
 
-# ============================================================
-# PRETTY FEATURE NAMES
-# ============================================================
+# User friendly feature names
+
 
 def pretty_feature_name(feature):
 
     replacements = {
 
         "EXT_SOURCE_1":
-            "External Credit Score 1",
+            "External credit information",
 
         "EXT_SOURCE_2":
-            "External Credit Score 2",
+            "External credit information",
 
         "EXT_SOURCE_3":
-            "External Credit Score 3",
+            "External credit information",
 
         "CREDIT_INCOME_RATIO":
-            "Credit-to-Income Ratio",
+            "Credit compared with income",
 
         "ANNUITY_INCOME_RATIO":
-            "Annuity-to-Income Ratio",
+            "Annual payment compared with income",
 
         "CREDIT_GOODS_RATIO":
-            "Credit-to-Goods Ratio",
+            "Credit compared with goods price",
 
         "GOODS_INCOME_RATIO":
-            "Goods-to-Income Ratio",
+            "Goods price compared with income",
 
         "ANNUITY_CREDIT_RATIO":
-            "Annuity-to-Credit Ratio",
+            "Annual payment compared with credit amount",
 
         "AGE_YEARS":
-            "Age (Years)",
+            "Age",
 
         "EMPLOYMENT_YEARS":
-            "Employment Duration",
+            "Employment duration",
 
         "REGISTRATION_YEARS":
-            "Years at Current Address",
+            "Years at current address",
 
         "ID_PUBLISH_YEARS":
-            "Years Since ID Published",
+            "Time since identification document was published",
 
         "LOAN_TERM":
-            "Loan Term",
+            "Loan term",
 
         "CREDIT_PER_PERSON":
-            "Credit per Family Member",
+            "Credit amount per family member",
 
         "INCOME_PER_PERSON":
-            "Income per Family Member",
+            "Income per family member",
 
         "INCOME_PER_CHILD":
-            "Income per Child",
+            "Income per child",
 
         "CHILDREN_RATIO":
-            "Children-to-Family Ratio",
+            "Children compared with family size",
 
         "EXT_SOURCE_MEAN":
-            "Average External Credit Score",
+            "Average external credit information",
 
         "EXT_SOURCE_MAX":
-            "Maximum External Credit Score",
+            "Maximum external credit information",
 
         "EXT_SOURCE_MIN":
-            "Minimum External Credit Score",
+            "Minimum external credit information",
 
         "EXT_SOURCE_STD":
-            "External Credit Score Variation",
+            "Variation in external credit information",
 
         "EXT_SOURCE_SUM":
-            "Total External Credit Score",
+            "Combined external credit information",
 
         "TOTAL_SOCIAL_OBS":
-            "Social Circle Observations",
+            "Social circle information",
 
         "TOTAL_SOCIAL_DEF":
-            "Social Circle Defaults",
+            "Social circle repayment information",
 
         "TOTAL_CONTACT_FLAGS":
-            "Contact Information Flags",
+            "Contact information",
+
+        "INSTAL_RECENCY_WEIGHTED_LATE_RATE":
+            "Recent late payment rate",
+
+        "INSTAL_AMT_PAYMENT_SUM":
+            "Total instalment payments",
+
+        "PREV_DAYS_LAST_DUE_1ST_VERSION_MAX":
+            "Previous loan repayment timing",
+
+        "AMT_ANNUITY":
+            "Annual loan payment",
+
+        "AMT_CREDIT":
+            "Credit amount requested",
+
+        "AMT_GOODS_PRICE":
+            "Value of goods being financed"
 
     }
 
@@ -270,40 +236,467 @@ def pretty_feature_name(feature):
 
         return replacements[feature]
 
+    feature_lower = feature.lower()
+
+    if "contract_type" in feature_lower:
+
+        return "Loan contract information"
+
+    if "education_type" in feature_lower:
+
+        return "Education information"
+
+    if "income_type" in feature_lower:
+
+        return "Income information"
+
+    if "organization_type" in feature_lower:
+
+        if "business_entity_type_1" in feature_lower:
+
+            return (
+                "Employment sector: Business Entity Type 1 "
+                "(dataset-defined category)"
+            )
+
+        if "business_entity_type_2" in feature_lower:
+
+            return (
+                "Employment sector: Business Entity Type 2 "
+                "(dataset-defined category)"
+            )
+
+        if "business_entity_type_3" in feature_lower:
+
+            return (
+                "Employment sector: Business Entity Type 3 "
+                "(dataset-defined category)"
+            )
+
+        if "self_employed" in feature_lower:
+
+            return "Employment sector: Self-employed"
+
+        if "government" in feature_lower:
+
+            return "Employment sector: Government"
+
+        return "Employment sector"
+
+    if "prev_" in feature_lower:
+
+        return "Previous loan history"
+
+    if "instal_" in feature_lower:
+
+        return "Instalment payment history"
+
+    if "bureau_" in feature_lower:
+
+        return "Credit bureau history"
+
+    if "pos_" in feature_lower:
+
+        return "Previous credit account history"
+
+    if "credit_card_" in feature_lower:
+
+        return "Credit card history"
+
+    if "flag_" in feature_lower:
+
+        return "Account information"
+
+    if "days_" in feature_lower:
+
+        return "Applicant history"
+
     return feature.replace(
         "_",
         " "
     ).title()
 
 
-# ============================================================
-# MODEL LOADING
-# ============================================================
+# Feature Hidden From user SHAP explanation
+
+
+HIDDEN_EXPLANATION_FEATURES = [
+
+    "CODE_GENDER",
+
+    "NAME_FAMILY_STATUS",
+
+    "NAME_EDUCATION_TYPE",
+
+    "CNT_CHILDREN",
+
+    "CNT_FAM_MEMBERS",
+
+    "NAME_CONTRACT_TYPE",
+
+    "NAME_INCOME_TYPE",
+
+    "ORGANIZATION_TYPE"
+
+]
+
+
+def should_hide_feature(feature):
+
+    feature_upper = feature.upper()
+
+    for hidden in HIDDEN_EXPLANATION_FEATURES:
+
+        if hidden in feature_upper:
+
+            return True
+
+    return False
+
+
+# Feature explanation and Guidance
+
+
+def get_feature_guidance(feature):
+
+    feature_upper = feature.upper()
+
+    guidance = {
+
+        "EXT_SOURCE_1": {
+            "meaning":
+                "This is an external credit-related score used by the model.",
+
+            "improve":
+                "Maintaining a positive repayment history may help strengthen similar credit indicators over time."
+        },
+
+        "EXT_SOURCE_2": {
+            "meaning":
+                "This is an external credit-related score used by the model.",
+
+            "improve":
+                "Maintaining a positive repayment history may help strengthen similar credit indicators over time."
+        },
+
+        "EXT_SOURCE_3": {
+            "meaning":
+                "This is an external credit-related score used by the model.",
+
+            "improve":
+                "Maintaining a positive repayment history may help strengthen similar credit indicators over time."
+        },
+
+        "EXT_SOURCE_MEAN": {
+            "meaning":
+                "This represents the average of the available external credit-related scores.",
+
+            "improve":
+                "A stronger overall credit profile may improve this indicator over time."
+        },
+
+        "EXT_SOURCE_MAX": {
+            "meaning":
+                "This represents the strongest available external credit-related score.",
+
+            "improve":
+                "Maintaining positive credit behaviour may help strengthen external credit information."
+        },
+
+        "EXT_SOURCE_MIN": {
+            "meaning":
+                "This represents the weakest available external credit-related score.",
+
+            "improve":
+                "Improving weaker areas of the overall credit profile may reduce the impact of this indicator."
+        },
+
+        "EXT_SOURCE_STD": {
+            "meaning":
+                "This measures how different the available external credit-related scores are from each other.",
+
+            "improve":
+                "More consistent and reliable credit information may reduce large differences between indicators."
+        },
+
+        "EXT_SOURCE_SUM": {
+            "meaning":
+                "This combines the available external credit-related scores.",
+
+            "improve":
+                "A stronger overall credit profile may improve the combined indicator."
+        },
+
+        "CREDIT_INCOME_RATIO": {
+            "meaning":
+                "This compares the requested credit amount with the applicant's income.",
+
+            "improve":
+                "A lower requested credit amount relative to income may improve affordability."
+        },
+
+        "ANNUITY_INCOME_RATIO": {
+            "meaning":
+                "This compares the expected loan payment with the applicant's income.",
+
+            "improve":
+                "Reducing the repayment burden relative to income may improve affordability."
+        },
+
+        "CREDIT_GOODS_RATIO": {
+            "meaning":
+                "This compares the requested credit amount with the value of the goods being financed.",
+
+            "improve":
+                "A financing request that is more proportionate to the goods value may reduce financial risk."
+        },
+
+        "GOODS_INCOME_RATIO": {
+            "meaning":
+                "This compares the value of the goods with the applicant's income.",
+
+            "improve":
+                "Choosing a purchase that is more affordable relative to income may improve the risk assessment."
+        },
+
+        "ANNUITY_CREDIT_RATIO": {
+            "meaning":
+                "This compares the expected loan payment with the total credit amount.",
+
+            "improve":
+                "A more manageable repayment structure may improve affordability."
+        },
+
+        "LOAN_TERM": {
+            "meaning":
+                "This estimates the relationship between the total credit amount and the regular loan payment.",
+
+            "improve":
+                "A repayment structure that better matches the applicant's financial capacity may improve affordability."
+        },
+
+        "AMT_ANNUITY": {
+            "meaning":
+                "This represents the expected regular loan repayment amount.",
+
+            "improve":
+                "A lower repayment amount may reduce pressure on the applicant's available income."
+        },
+
+        "AMT_CREDIT": {
+            "meaning":
+                "This represents the total amount of credit requested.",
+
+            "improve":
+                "Requesting an amount that is appropriate for income and repayment capacity may reduce risk."
+        },
+
+        "AMT_GOODS_PRICE": {
+            "meaning":
+                "This represents the value of the goods associated with the credit request.",
+
+            "improve":
+                "The financing amount should remain reasonable relative to the value of the goods."
+        },
+
+        "AGE_YEARS": {
+            "meaning":
+                "This represents the applicant's age.",
+
+            "improve":
+                "Age itself cannot and should not be changed for credit assessment purposes."
+        },
+
+        "EMPLOYMENT_YEARS": {
+            "meaning":
+                "This represents the applicant's length of employment.",
+
+            "improve":
+                "Longer and more stable employment history may provide stronger evidence of financial stability."
+        },
+
+        "EMPLOYMENT_AGE_RATIO": {
+            "meaning":
+                "This compares the applicant's employment duration with their age.",
+
+            "improve":
+                "A longer and more stable employment history may strengthen this type of indicator."
+        },
+
+        "REGISTRATION_YEARS": {
+            "meaning":
+                "This represents how long the applicant has been registered at the current address.",
+
+            "improve":
+                "Longer residential stability may provide additional evidence of stability."
+        },
+
+        "INSTAL_RECENCY_WEIGHTED_LATE_RATE": {
+            "meaning":
+                "This measures recent late repayment behaviour, giving more importance to recent payment history.",
+
+            "improve":
+                "Making future repayments on time may gradually improve this indicator."
+        },
+
+        "INSTAL_AMT_PAYMENT_SUM": {
+            "meaning":
+                "This summarizes historical instalment payment activity.",
+
+            "improve":
+                "Consistent repayment behaviour may strengthen the overall repayment history."
+        },
+
+        "PREV_DAYS_LAST_DUE_1ST_VERSION_MAX": {
+            "meaning":
+                "This relates to repayment timing in previous credit applications.",
+
+            "improve":
+                "Meeting future repayment obligations on time may strengthen repayment history."
+        },
+
+        "TOTAL_SOCIAL_DEF": {
+            "meaning":
+                "This summarizes default-related information recorded in the applicant's available social credit data.",
+
+            "improve":
+                "This factor may not be directly controllable by the applicant and should be interpreted carefully."
+        },
+
+        "TOTAL_SOCIAL_OBS": {
+            "meaning":
+                "This summarizes available social credit information in the dataset.",
+
+            "improve":
+                "This factor may not be directly controllable by the applicant."
+        },
+
+        "INCOME_PER_PERSON": {
+            "meaning":
+                "This estimates the amount of income available per family member.",
+
+            "improve":
+                "Higher available household income relative to household size may improve affordability."
+        },
+
+        "CREDIT_PER_PERSON": {
+            "meaning":
+                "This estimates the requested credit burden per family member.",
+
+            "improve":
+                "A lower credit burden relative to household financial capacity may improve affordability."
+        },
+
+        "CHILDREN_RATIO": {
+            "meaning":
+                "This compares the number of children with the total family size.",
+
+            "improve":
+                "This is a household characteristic and should not be treated as something the applicant must change."
+        },
+
+        "INCOME_PER_CHILD": {
+            "meaning":
+                "This estimates income relative to the number of children.",
+
+            "improve":
+                "Greater financial capacity relative to household responsibilities may improve affordability."
+        }
+
+    }
+
+    if feature_upper in guidance:
+
+        return guidance[feature_upper]
+
+    if feature_upper.startswith("PREV_"):
+
+        return {
+            "meaning":
+                "This factor is related to the applicant's previous loan history.",
+
+            "improve":
+                "Consistent repayment and responsible use of credit may strengthen future credit history."
+        }
+
+    if feature_upper.startswith("INSTAL_"):
+
+        return {
+            "meaning":
+                "This factor is related to the applicant's instalment payment history.",
+
+            "improve":
+                "Maintaining timely payments may improve future repayment indicators."
+        }
+
+    if feature_upper.startswith("BUREAU_"):
+
+        return {
+            "meaning":
+                "This factor is based on information from previous or existing credit bureau records.",
+
+            "improve":
+                "Maintaining positive credit behaviour may improve future credit bureau information."
+        }
+
+    if feature_upper.startswith("POS_"):
+
+        return {
+            "meaning":
+                "This factor is related to previous point-of-sale or consumer credit account history.",
+
+            "improve":
+                "Consistent repayment behaviour may strengthen future account history."
+        }
+
+    if feature_upper.startswith("CREDIT_CARD_"):
+
+        return {
+            "meaning":
+                "This factor is related to historical credit card account information.",
+
+            "improve":
+                "Managing credit responsibly and paying obligations on time may strengthen future history."
+        }
+
+    return {
+
+        "meaning":
+            "This is a financial or credit-related factor that influenced the model's estimated risk.",
+
+        "improve":
+            "This factor should be reviewed together with the applicant's complete financial and credit information."
+    }
+
+
+# Model Loading
 
 @st.cache_resource
 def load_model():
 
     model_path = (
         Path("output")
-        / "credit_risk_model.pkl"
+        / "final_credit_risk_model.pkl"
     )
 
-    with open(
-        model_path,
-        "rb"
-    ) as file:
-
-        package = pickle.load(file)
+    package = joblib.load(
+        model_path
+    )
 
     return package
 
 
+# Load final model package
 try:
 
     model_package = load_model()
 
     final_model = (
         model_package["model"]
+    )
+
+    final_calibrator = (
+        model_package["calibrator"]
     )
 
     final_threshold = (
@@ -314,23 +707,8 @@ try:
         model_package["training_columns"]
     )
 
-    top_15_org = (
-        model_package[
-            "top_15_organization_types"
-        ]
-    )
-
     categorical_columns = (
-        model_package[
-            "categorical_columns"
-        ]
-    )
-
-    metadata = (
-        model_package.get(
-            "metadata",
-            {}
-        )
+        model_package["categorical_columns"]
     )
 
 except Exception as e:
@@ -344,10 +722,7 @@ except Exception as e:
     st.stop()
 
 
-# ============================================================
-# REFERENCE DATA
-# ============================================================
-
+# Reference Data
 @st.cache_data
 def load_reference_data():
 
@@ -361,17 +736,11 @@ def load_reference_data():
     )
 
 
-# ============================================================
-# FEATURE ENGINEERING
-# ============================================================
+# Feature Engineering
 
 def engineer_features(df):
 
     df = df.copy()
-
-    # --------------------------------------------------------
-    # FINANCIAL RATIOS
-    # --------------------------------------------------------
 
     df["CREDIT_INCOME_RATIO"] = safe_divide(
         df["AMT_CREDIT"],
@@ -398,10 +767,6 @@ def engineer_features(df):
         df["AMT_CREDIT"]
     )
 
-    # --------------------------------------------------------
-    # FAMILY FEATURES
-    # --------------------------------------------------------
-
     df["INCOME_PER_PERSON"] = safe_divide(
         df["AMT_INCOME_TOTAL"],
         df["CNT_FAM_MEMBERS"]
@@ -422,10 +787,6 @@ def engineer_features(df):
         df["CNT_FAM_MEMBERS"]
     )
 
-    # --------------------------------------------------------
-    # AGE
-    # --------------------------------------------------------
-
     df["AGE_YEARS"] = (
         -df["DAYS_BIRTH"] / 365
     )
@@ -442,10 +803,6 @@ def engineer_features(df):
         -df["DAYS_ID_PUBLISH"] / 365
     )
 
-    # --------------------------------------------------------
-    # EMPLOYMENT RATIOS
-    # --------------------------------------------------------
-
     df["EMPLOYMENT_AGE_RATIO"] = safe_divide(
         df["EMPLOYMENT_YEARS"],
         df["AGE_YEARS"]
@@ -456,24 +813,14 @@ def engineer_features(df):
         df["AGE_YEARS"]
     )
 
-    # --------------------------------------------------------
-    # EXTERNAL CREDIT SCORES
-    # --------------------------------------------------------
-
     ext_cols = [
-
         col
-
         for col in [
-
             "EXT_SOURCE_1",
             "EXT_SOURCE_2",
             "EXT_SOURCE_3"
-
         ]
-
         if col in df.columns
-
     ]
 
     if ext_cols:
@@ -498,133 +845,83 @@ def engineer_features(df):
             df[ext_cols].sum(axis=1)
         )
 
-    # --------------------------------------------------------
-    # LOAN TERM
-    # --------------------------------------------------------
-
     df["LOAN_TERM"] = safe_divide(
         df["AMT_CREDIT"],
         df["AMT_ANNUITY"]
     )
 
-    # --------------------------------------------------------
-    # SOCIAL CIRCLE
-    # --------------------------------------------------------
+    if (
+        "OBS_30_CNT_SOCIAL_CIRCLE" in df.columns
+        and
+        "OBS_60_CNT_SOCIAL_CIRCLE" in df.columns
+    ):
 
-    df["TOTAL_SOCIAL_OBS"] = (
+        df["TOTAL_SOCIAL_OBS"] = (
+            df["OBS_30_CNT_SOCIAL_CIRCLE"]
+            +
+            df["OBS_60_CNT_SOCIAL_CIRCLE"]
+        )
 
-        df["OBS_30_CNT_SOCIAL_CIRCLE"]
+    if (
+        "DEF_30_CNT_SOCIAL_CIRCLE" in df.columns
+        and
+        "DEF_60_CNT_SOCIAL_CIRCLE" in df.columns
+    ):
 
-        +
+        df["TOTAL_SOCIAL_DEF"] = (
+            df["DEF_30_CNT_SOCIAL_CIRCLE"]
+            +
+            df["DEF_60_CNT_SOCIAL_CIRCLE"]
+        )
 
-        df["OBS_60_CNT_SOCIAL_CIRCLE"]
+    contact_columns = [
 
-    )
+        "FLAG_MOBIL",
+        "FLAG_EMP_PHONE",
+        "FLAG_WORK_PHONE",
+        "FLAG_CONT_MOBILE",
+        "FLAG_PHONE",
+        "FLAG_EMAIL"
 
-    df["TOTAL_SOCIAL_DEF"] = (
+    ]
 
-        df["DEF_30_CNT_SOCIAL_CIRCLE"]
+    existing_contact = [
 
-        +
+        col
+        for col in contact_columns
+        if col in df.columns
 
-        df["DEF_60_CNT_SOCIAL_CIRCLE"]
+    ]
 
-    )
+    if existing_contact:
 
-    # --------------------------------------------------------
-    # CONTACT FLAGS
-    # --------------------------------------------------------
-
-    df["TOTAL_CONTACT_FLAGS"] = (
-
-        df["FLAG_MOBIL"]
-
-        +
-
-        df["FLAG_EMP_PHONE"]
-
-        +
-
-        df["FLAG_WORK_PHONE"]
-
-        +
-
-        df["FLAG_CONT_MOBILE"]
-
-        +
-
-        df["FLAG_PHONE"]
-
-        +
-
-        df["FLAG_EMAIL"]
-
-    )
+        df["TOTAL_CONTACT_FLAGS"] = (
+            df[existing_contact].sum(axis=1)
+        )
 
     return df
 
 
-# ============================================================
-# PREPARE DATA FOR MODEL
-# ============================================================
+# Preparing data for model
 
 def prepare_for_model(applicant):
 
     df = applicant.copy()
 
-    # --------------------------------------------------------
-    # ORGANIZATION GROUPING
-    # --------------------------------------------------------
+    df = engineer_features(df)
 
-    if "ORGANIZATION_TYPE" in df.columns:
-
-        df["ORGANIZATION_TYPE"] = np.where(
-
-            df["ORGANIZATION_TYPE"].isin(
-                top_15_org
-            ),
-
-            df["ORGANIZATION_TYPE"],
-
-            "Other"
-
-        )
-
-    # --------------------------------------------------------
-    # FEATURE ENGINEERING
-    # --------------------------------------------------------
-
-    df = engineer_features(
-        df
+    df = df.drop(
+        columns=[
+            "SK_ID_CURR",
+            "TARGET"
+        ],
+        errors="ignore"
     )
-
-    # --------------------------------------------------------
-    # REMOVE ID AND TARGET
-    # --------------------------------------------------------
-
-    for col in [
-
-        "SK_ID_CURR",
-        "TARGET"
-
-    ]:
-
-        if col in df.columns:
-
-            df = df.drop(
-                columns=[col]
-            )
-
-    # --------------------------------------------------------
-    # CATEGORICAL ENCODING
-    # --------------------------------------------------------
 
     existing_categorical = [
 
         col
-
         for col in categorical_columns
-
         if col in df.columns
 
     ]
@@ -632,47 +929,22 @@ def prepare_for_model(applicant):
     if existing_categorical:
 
         df = pd.get_dummies(
-
             df,
-
             columns=existing_categorical,
-
             drop_first=False,
-
             dtype="int8"
-
         )
 
-    # --------------------------------------------------------
-    # CLEAN COLUMN NAMES
-    # --------------------------------------------------------
-
-    df = clean_column_names(
-        df
-    )
-
-    # --------------------------------------------------------
-    # EXACT TRAINING SCHEMA
-    # --------------------------------------------------------
+    df = clean_column_names(df)
 
     df = df.reindex(
-
         columns=training_columns,
-
         fill_value=0
-
     )
 
-    # --------------------------------------------------------
-    # HANDLE INFINITY / MISSING VALUES
-    # --------------------------------------------------------
-
     df = df.replace(
-
         [np.inf, -np.inf],
-
         np.nan
-
     )
 
     df = df.fillna(0)
@@ -680,24 +952,18 @@ def prepare_for_model(applicant):
     return df
 
 
-# ============================================================
-# REFERENCE VALUES
-# ============================================================
-
+# Reference Values
 @st.cache_data
 def get_reference_values():
 
     reference = load_reference_data()
 
     reference = reference.drop(
-
         columns=[
             "TARGET",
             "SK_ID_CURR"
         ],
-
         errors="ignore"
-
     )
 
     values = {}
@@ -709,15 +975,13 @@ def get_reference_values():
         ):
 
             values[col] = (
-                reference[col]
-                .median()
+                reference[col].median()
             )
 
         else:
 
             mode = (
-                reference[col]
-                .mode()
+                reference[col].mode()
             )
 
             if len(mode) > 0:
@@ -733,135 +997,87 @@ def get_reference_values():
     return values
 
 
-# ============================================================
-# HEADER
-# ============================================================
-
-st.markdown(
-
-    '<div class="title-text">'
-    'Credit Risk Assessment'
-    '</div>',
-
-    unsafe_allow_html=True
-
+# Header
+st.title(
+    "Credit Risk Assessment"
 )
 
-st.markdown(
-
-    """
-    <div class="subtitle-text">
-    Intelligent loan default risk assessment powered by a
-    tuned LightGBM machine learning model.
-    </div>
-    """,
-
-    unsafe_allow_html=True
-
+st.write(
+    "AI-powered assessment of loan default risk "
+    "using historical credit information."
 )
 
 
-# ============================================================
-# SIDEBAR
-# ============================================================
+# Sidebar
 
 with st.sidebar:
 
-    st.header(
-        "About the Model"
+    st.title(
+        "Credit Risk Assessment"
     )
 
     st.write(
+        "### How to use this tool"
+    )
 
-        """
-        This application uses the final tuned LightGBM
-        credit-risk model developed for the Home Credit
-        default prediction project.
-        """
+    st.write(
+        "**1. Enter applicant information**\n\n"
+        "Provide the available applicant and loan details.\n\n"
 
+        "**2. Assess the application**\n\n"
+        "Select **Assess Credit Risk** to generate an estimate.\n\n"
+
+        "**3. Review the result**\n\n"
+        "Review the estimated probability and the main "
+        "factors influencing the assessment."
     )
 
     st.divider()
 
-    st.metric(
-        "Model",
-        "Tuned LightGBM"
+    st.write(
+        "### Important"
     )
-
-    st.metric(
-        "Model Features",
-        str(len(training_columns))
-    )
-
-    st.metric(
-        "Decision Threshold",
-        f"{final_threshold:.2f}"
-    )
-
-    if "validation_roc_auc" in metadata:
-
-        st.metric(
-
-            "Validation ROC-AUC",
-
-            f"{metadata['validation_roc_auc']:.4f}"
-
-        )
-
-    st.divider()
 
     st.caption(
-
-        "Higher predicted probability indicates "
-        "higher estimated default risk."
-
+        "This tool provides a machine-learning estimate. "
+        "It should support professional credit assessment "
+        "rather than replace human judgement."
     )
 
 
-# ============================================================
-# TABS
-# ============================================================
+# Tabs
 
 tab1, tab2 = st.tabs(
-
     [
         "Individual Assessment",
         "Batch Assessment"
     ]
-
 )
 
 
-# ============================================================
-# INDIVIDUAL ASSESSMENT
-# ============================================================
+# Individual Assesment
 
 with tab1:
 
-    st.subheader(
+    st.header(
         "Applicant Information"
     )
 
     st.info(
-
-        """
-        Enter the applicant's information below.
-        Fields not directly entered are handled using
-        reference values from the training data.
-        """
-
+        "Enter the applicant's information below. "
+        "Information not directly entered is completed "
+        "using typical values from the training data."
     )
 
     reference_values = (
         get_reference_values()
     )
 
-    # --------------------------------------------------------
-    # PERSONAL INFORMATION
-    # --------------------------------------------------------
 
-    st.markdown(
-        "### Personal Information"
+    # Personal Information
+
+    st.subheader(
+        "Personal Information"
     )
 
     col1, col2, col3 = st.columns(3)
@@ -876,29 +1092,21 @@ with tab1:
     with col2:
 
         age = st.number_input(
-
             "Age",
-
             min_value=18,
-
             max_value=100,
-
-            value=35
-
+            value=35,
+            step=1
         )
 
     with col3:
 
         children = st.number_input(
-
             "Number of Children",
-
             min_value=0,
-
             max_value=20,
-
-            value=0
-
+            value=0,
+            step=1
         )
 
     col1, col2, col3 = st.columns(3)
@@ -906,59 +1114,40 @@ with tab1:
     with col1:
 
         family_members = st.number_input(
-
             "Family Members",
-
-            min_value=1.0,
-
-            max_value=30.0,
-
-            value=2.0
-
+            min_value=1,
+            max_value=30,
+            value=2,
+            step=1
         )
 
     with col2:
 
         income = st.number_input(
-
             "Annual Income",
-
             min_value=0.0,
-
             value=150000.0,
-
             step=10000.0
-
         )
 
     with col3:
 
         education = st.selectbox(
-
             "Education",
-
             [
-
                 "Secondary / secondary special",
-
                 "Higher education",
-
                 "Incomplete higher",
-
                 "Lower secondary",
-
                 "Academic degree"
-
             ]
-
         )
 
-    # --------------------------------------------------------
-    # LOAN INFORMATION
-    # --------------------------------------------------------
 
-    st.markdown(
-        "### Loan Information"
+    # Loan Information
+
+    st.subheader(
+        "Loan Information"
     )
 
     col1, col2, col3 = st.columns(3)
@@ -966,43 +1155,28 @@ with tab1:
     with col1:
 
         credit = st.number_input(
-
             "Credit Amount",
-
             min_value=0.0,
-
             value=500000.0,
-
             step=10000.0
-
         )
 
     with col2:
 
         annuity = st.number_input(
-
             "Annual Annuity",
-
             min_value=0.0,
-
             value=30000.0,
-
             step=1000.0
-
         )
 
     with col3:
 
         goods_price = st.number_input(
-
             "Goods Price",
-
             min_value=0.0,
-
             value=500000.0,
-
             step=10000.0
-
         )
 
     col1, col2 = st.columns(2)
@@ -1010,53 +1184,35 @@ with tab1:
     with col1:
 
         contract_type = st.selectbox(
-
             "Contract Type",
-
             [
-
                 "Cash loans",
-
                 "Revolving loans"
-
             ]
-
         )
 
     with col2:
 
         income_type = st.selectbox(
-
             "Income Type",
-
             [
-
                 "Working",
-
                 "Commercial associate",
-
                 "Pensioner",
-
                 "State servant",
-
                 "Student",
-
                 "Businessman",
-
                 "Maternity leave",
-
                 "Unemployed"
-
             ]
-
         )
 
-    # --------------------------------------------------------
-    # EMPLOYMENT
-    # --------------------------------------------------------
 
-    st.markdown(
-        "### Employment and Stability"
+    # Employment and stability
+    
+
+    st.subheader(
+        "Employment and Stability"
     )
 
     col1, col2, col3 = st.columns(3)
@@ -1064,67 +1220,50 @@ with tab1:
     with col1:
 
         employment_years = st.number_input(
-
             "Employment Years",
-
             min_value=0.0,
-
             max_value=70.0,
-
             value=5.0,
-
             step=1.0
-
         )
 
     with col2:
 
         registration_years = st.number_input(
-
             "Years at Current Address",
-
             min_value=0.0,
-
             max_value=100.0,
-
             value=5.0,
-
             step=1.0
-
         )
 
     with col3:
 
         organization = st.selectbox(
-
-            "Organization Type",
-
+            "Employment Sector",
             [
-
                 "Business Entity Type 3",
-
                 "Business Entity Type 2",
-
                 "Self-employed",
-
                 "Government",
-
                 "Other"
-
             ]
-
         )
 
-    # --------------------------------------------------------
-    # EXTERNAL CREDIT SCORES
-    # --------------------------------------------------------
+    st.caption(
+        "Business Entity categories are original dataset "
+        "categories and do not have a more specific industry description."
+    )
 
-    st.markdown(
-        "### External Credit Scores"
+
+    # External Credit Scores
+    
+    st.subheader(
+        "External Credit Scores"
     )
 
     st.caption(
-        "Values should generally fall between 0 and 1."
+        "Values generally range from 0 to 1."
     )
 
     col1, col2, col3 = st.columns(3)
@@ -1132,51 +1271,38 @@ with tab1:
     with col1:
 
         ext1 = st.slider(
-
             "External Score 1",
-
-            0.0,
-
-            1.0,
-
-            0.5
-
+            min_value=0.0,
+            max_value=1.0,
+            value=0.5,
+            step=0.01
         )
 
     with col2:
 
         ext2 = st.slider(
-
             "External Score 2",
-
-            0.0,
-
-            1.0,
-
-            0.5
-
+            min_value=0.0,
+            max_value=1.0,
+            value=0.5,
+            step=0.01
         )
 
     with col3:
 
         ext3 = st.slider(
-
             "External Score 3",
-
-            0.0,
-
-            1.0,
-
-            0.5
-
+            min_value=0.0,
+            max_value=1.0,
+            value=0.5,
+            step=0.01
         )
 
-    # --------------------------------------------------------
-    # CONTACT INFORMATION
-    # --------------------------------------------------------
 
-    st.markdown(
-        "### Contact Information"
+    # Contact Information
+
+    st.subheader(
+        "Contact Information"
     )
 
     col1, col2, col3 = st.columns(3)
@@ -1202,25 +1328,19 @@ with tab1:
             value=True
         )
 
-    # --------------------------------------------------------
-    # PREDICTION BUTTON
-    # --------------------------------------------------------
+
+    # Prediction Button
 
     st.divider()
 
     predict_button = st.button(
-
         "Assess Credit Risk",
-
         type="primary",
-
         use_container_width=True
-
     )
 
-    # ========================================================
-    # PREDICTION
-    # ========================================================
+
+   # Prediction
 
     if predict_button:
 
@@ -1228,39 +1348,33 @@ with tab1:
             "Assessing applicant risk..."
         ):
 
-            # Start from training reference values
-
             applicant = pd.DataFrame(
                 [reference_values]
             )
 
-            # ------------------------------------------------
-            # USER INPUTS
-            # ------------------------------------------------
-
             applicant["CODE_GENDER"] = gender
 
-            applicant["CNT_CHILDREN"] = (
+            applicant["CNT_CHILDREN"] = int(
                 children
             )
 
-            applicant["CNT_FAM_MEMBERS"] = (
+            applicant["CNT_FAM_MEMBERS"] = int(
                 family_members
             )
 
-            applicant["AMT_INCOME_TOTAL"] = (
+            applicant["AMT_INCOME_TOTAL"] = float(
                 income
             )
 
-            applicant["AMT_CREDIT"] = (
+            applicant["AMT_CREDIT"] = float(
                 credit
             )
 
-            applicant["AMT_ANNUITY"] = (
+            applicant["AMT_ANNUITY"] = float(
                 annuity
             )
 
-            applicant["AMT_GOODS_PRICE"] = (
+            applicant["AMT_GOODS_PRICE"] = float(
                 goods_price
             )
 
@@ -1280,15 +1394,15 @@ with tab1:
                 organization
             )
 
-            applicant["EXT_SOURCE_1"] = (
+            applicant["EXT_SOURCE_1"] = float(
                 ext1
             )
 
-            applicant["EXT_SOURCE_2"] = (
+            applicant["EXT_SOURCE_2"] = float(
                 ext2
             )
 
-            applicant["EXT_SOURCE_3"] = (
+            applicant["EXT_SOURCE_3"] = float(
                 ext3
             )
 
@@ -1304,73 +1418,47 @@ with tab1:
                 email
             )
 
-            # ------------------------------------------------
-            # CONVERT YEARS TO ORIGINAL HOME CREDIT FORMAT
-            # ------------------------------------------------
-
             applicant["DAYS_BIRTH"] = (
-                -age * 365
+                -float(age) * 365
             )
 
             applicant["DAYS_EMPLOYED"] = (
-                -employment_years * 365
+                -float(employment_years) * 365
             )
 
             applicant["DAYS_REGISTRATION"] = (
-                -registration_years * 365
+                -float(registration_years) * 365
             )
-
-            # ------------------------------------------------
-            # PREPARE MODEL INPUT
-            # ------------------------------------------------
 
             X_input = prepare_for_model(
                 applicant
             )
 
-            # ------------------------------------------------
-            # VERIFY MODEL SCHEMA
-            # ------------------------------------------------
-
-            if X_input.shape[1] != len(
-                training_columns
-            ):
-
-                raise ValueError(
-
-                    "Model input contains "
-                    f"{X_input.shape[1]} features, "
-                    f"but the model expects "
-                    f"{len(training_columns)}."
-
-                )
-
-            # ------------------------------------------------
-            # PREDICTION
-            # ------------------------------------------------
-
-            probability = (
-
+            raw_probability = (
                 final_model
                 .predict_proba(
                     X_input
                 )[0, 1]
+            )
 
+            probability = (
+                final_calibrator
+                .predict(
+                    np.array([raw_probability])
+                )[0]
             )
 
             prediction = int(
-
-                probability
-                >= final_threshold
-
+                probability >= final_threshold
             )
 
-        # ====================================================
-        # RESULTS
-        # ====================================================
 
-        st.markdown(
-            "## Risk Assessment Result"
+        # Risk Assesment
+
+        st.divider()
+
+        st.header(
+            "Risk Assessment"
         )
 
         probability_pct = (
@@ -1379,80 +1467,66 @@ with tab1:
 
         if prediction == 1:
 
-            risk_level = "HIGH RISK"
-
-            recommendation = (
-
-                "The model estimates a relatively "
-                "high probability of loan default. "
-                "Further credit assessment is recommended "
-                "before approval."
-
+            risk_level = (
+                "Higher Estimated Risk"
             )
 
-            st.error(
-                risk_level
+            recommendation = (
+                "The model estimates that this applicant "
+                "has a relatively higher likelihood of default. "
+                "Further credit assessment is recommended "
+                "before approval."
             )
 
         else:
 
-            risk_level = "LOWER RISK"
+            risk_level = (
+                "Lower Estimated Risk"
+            )
 
             recommendation = (
-
-                "The model estimates a relatively "
-                "lower probability of loan default. "
-                "The application may proceed to "
-                "normal credit assessment."
-
+                "The model estimates that this applicant "
+                "has a relatively lower likelihood of default. "
+                "The application may proceed to normal "
+                "credit assessment."
             )
 
-            st.success(
-                risk_level
-            )
-
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
 
         with col1:
 
             st.metric(
-
-                "Default Probability",
-
+                "Estimated Default Probability",
                 f"{probability_pct:.2f}%"
-
             )
 
         with col2:
 
             st.metric(
-
-                "Decision Threshold",
-
-                f"{final_threshold * 100:.0f}%"
-
-            )
-
-        with col3:
-
-            st.metric(
-
-                "Model Decision",
-
+                "Model Classification",
                 (
-                    "Default Risk"
+                    "Higher Risk"
                     if prediction == 1
                     else "Lower Risk"
                 )
-
             )
 
-        st.progress(
-            min(probability, 1.0)
+        st.caption(
+            f"Decision threshold: {final_threshold:.2f}"
         )
 
-        st.markdown(
-            "### Interpretation"
+        st.progress(
+            min(
+                max(
+                    float(probability),
+                    0.0
+                ),
+                1.0
+            )
+        )
+
+        st.subheader(
+            "What does this mean?"
         )
 
         st.write(
@@ -1460,29 +1534,22 @@ with tab1:
         )
 
         st.caption(
-
-            "This prediction is a machine-learning "
-            "risk estimate and should support, not replace, "
-            "human credit assessment."
-
+            "This is a machine-learning estimate and should "
+            "support, not replace, human credit assessment."
         )
 
-        # ====================================================
-        # SHAP EXPLANATION
-        # ====================================================
+
+        # SHAP Explanation
 
         st.divider()
 
-        st.markdown(
-            "### Why did the model make this decision?"
+        st.header(
+            "Why did the model make this decision?"
         )
 
         st.write(
-
-            "SHAP explains the individual prediction by "
-            "showing which features pushed the model toward "
-            "higher or lower estimated default risk."
-
+            "The following factors had the greatest influence "
+            "on this applicant's estimated default risk."
         )
 
         try:
@@ -1494,277 +1561,218 @@ with tab1:
                 )
             )
 
-            meaningful = (
+            shap_explanation = (
                 shap_explanation[
-                    shap_explanation["Impact"] > 0
-                ]
-                .copy()
+                    ~shap_explanation[
+                        "Feature"
+                    ].apply(
+                        should_hide_feature
+                    )
+                ].copy()
             )
 
             risk_increasing = (
-
-                meaningful[
-                    meaningful["SHAP"] > 0
+                shap_explanation[
+                    shap_explanation["SHAP"] > 0
                 ]
-
                 .sort_values(
                     "SHAP",
                     ascending=False
                 )
-
                 .head(5)
-
             )
 
             risk_reducing = (
-
-                meaningful[
-                    meaningful["SHAP"] < 0
+                shap_explanation[
+                    shap_explanation["SHAP"] < 0
                 ]
-
                 .sort_values(
                     "SHAP",
                     ascending=True
                 )
-
                 .head(5)
-
             )
 
-            col1, col2 = st.columns(2)
 
-            # ------------------------------------------------
-            # RISK INCREASING
-            # ------------------------------------------------
+            # SHAP factors
+            
 
-            with col1:
+            left_column, right_column = st.columns(2)
 
-                st.markdown(
-                    "#### Factors Increasing Estimated Risk"
+
+            # factors Increasing Risk
+
+            with left_column:
+
+                st.subheader(
+                    "Factors Increasing Estimated Risk"
                 )
 
                 if risk_increasing.empty:
 
-                    st.info(
-                        "No material risk-increasing "
-                        "factors were identified."
+                    st.write(
+                        "No major risk-increasing factors "
+                        "were identified."
                     )
 
                 else:
 
-                    max_impact = max(
-
-                        float(
-                            risk_increasing[
-                                "SHAP"
-                            ]
-                            .abs()
-                            .max()
-                        ),
-
-                        1e-9
-
-                    )
-
-                    for _, row in (
+                    for index, row in (
                         risk_increasing.iterrows()
                     ):
 
-                        st.write(
+                        feature = row["Feature"]
 
-                            f"**{pretty_feature_name(row['Feature'])}**"
-
-                        )
-
-                        st.caption(
-
-                            f"Model impact: +{row['SHAP']:.4f} | "
-                            f"Input value: {row['Value']:.4g}"
-
-                        )
-
-                        st.progress(
-
-                            min(
-
-                                float(
-                                    abs(row["SHAP"])
-                                )
-                                / max_impact,
-
-                                1.0
-
+                        feature_name = (
+                            pretty_feature_name(
+                                feature
                             )
-
                         )
 
-            # ------------------------------------------------
-            # RISK REDUCING
-            # ------------------------------------------------
+                        guidance = (
+                            get_feature_guidance(
+                                feature
+                            )
+                        )
 
-            with col2:
+                        st.markdown(
+                            f"**{feature_name}**"
+                        )
 
-                st.markdown(
-                    "#### Factors Reducing Estimated Risk"
+                        st.write(
+                            f"**What it means:** "
+                            f"{guidance['meaning']}"
+                        )
+
+                        st.write(
+                            f"**What may help:** "
+                            f"{guidance['improve']}"
+                        )
+
+                        if (
+                            index
+                            !=
+                            risk_increasing.index[-1]
+                        ):
+
+                            st.divider()
+
+
+           # factors Reducing Risk
+
+            with right_column:
+
+                st.subheader(
+                    "Factors Reducing Estimated Risk"
                 )
 
                 if risk_reducing.empty:
 
-                    st.info(
-                        "No material risk-reducing "
-                        "factors were identified."
+                    st.write(
+                        "No major risk-reducing factors "
+                        "were identified."
                     )
 
                 else:
 
-                    max_impact = max(
-
-                        float(
-                            risk_reducing[
-                                "SHAP"
-                            ]
-                            .abs()
-                            .max()
-                        ),
-
-                        1e-9
-
-                    )
-
-                    for _, row in (
+                    for index, row in (
                         risk_reducing.iterrows()
                     ):
 
-                        st.write(
+                        feature = row["Feature"]
 
-                            f"**{pretty_feature_name(row['Feature'])}**"
-
-                        )
-
-                        st.caption(
-
-                            f"Model impact: {row['SHAP']:.4f} | "
-                            f"Input value: {row['Value']:.4g}"
-
-                        )
-
-                        st.progress(
-
-                            min(
-
-                                float(
-                                    abs(row["SHAP"])
-                                )
-                                / max_impact,
-
-                                1.0
-
+                        feature_name = (
+                            pretty_feature_name(
+                                feature
                             )
-
                         )
 
-            # ------------------------------------------------
-            # TOP DRIVERS TABLE
-            # ------------------------------------------------
+                        guidance = (
+                            get_feature_guidance(
+                                feature
+                            )
+                        )
 
-            st.markdown(
-                "#### Top Model Drivers"
+                        st.markdown(
+                            f"**{feature_name}**"
+                        )
+
+                        st.write(
+                            f"**Why it helped:** "
+                            f"{guidance['meaning']}"
+                        )
+
+                        st.write(
+                            "This factor moved the model's "
+                            "estimate toward a lower probability "
+                            "of default."
+                        )
+
+                        if (
+                            index
+                            !=
+                            risk_reducing.index[-1]
+                        ):
+
+                            st.divider()
+
+
+            # Interpretation
+
+            st.divider()
+
+            st.subheader(
+                "How should this explanation be interpreted?"
             )
 
-            top_drivers = (
-                shap_explanation
-                .head(10)
-                .copy()
+            st.write(
+                "Factors listed under increasing risk moved "
+                "the model's estimate toward a higher "
+                "probability of default."
             )
 
-            top_drivers["Feature"] = (
-                top_drivers["Feature"]
-                .apply(
-                    pretty_feature_name
-                )
-            )
-
-            top_drivers["Direction"] = np.where(
-
-                top_drivers["SHAP"] > 0,
-
-                "Higher default risk",
-
-                "Lower default risk"
-
-            )
-
-            top_drivers["SHAP Impact"] = (
-                top_drivers["SHAP"]
-                .round(4)
-            )
-
-            st.dataframe(
-
-                top_drivers[
-                    [
-                        "Feature",
-                        "Direction",
-                        "SHAP Impact"
-                    ]
-                ],
-
-                hide_index=True,
-
-                use_container_width=True
-
+            st.write(
+                "Factors listed under reducing risk moved "
+                "the model's estimate toward a lower "
+                "probability of default."
             )
 
             st.caption(
-
-                "SHAP impact describes the direction and "
-                "relative contribution of each feature to "
-                "this individual model prediction. It does "
-                "not represent a causal relationship."
-
+                "These factors describe how the model arrived "
+                "at its estimate. They should not be interpreted "
+                "as proof that any individual factor caused "
+                "the applicant's risk."
             )
 
         except Exception as shap_error:
 
             st.warning(
-
-                "The credit-risk prediction was completed "
-                "successfully, but the local explanation "
-                "could not be generated."
-
+                "The risk assessment was completed, but the "
+                "individual explanation could not be generated."
             )
 
             st.caption(
-                f"Explanation details: {shap_error}"
+                f"SHAP error: {shap_error}"
             )
 
 
-# ============================================================
-# BATCH ASSESSMENT
-# ============================================================
+# Batch Assesment
 
 with tab2:
 
-    st.subheader(
+    st.header(
         "Batch Credit Risk Assessment"
     )
 
     st.write(
-
-        """
-        Upload a CSV containing applicant records.
-        The application will align the columns with the
-        model's training schema and generate predictions.
-        """
-
+        "Upload a CSV containing applicant records. "
+        "The application will process the applicants and "
+        "generate calibrated estimated default probabilities."
     )
 
     uploaded_file = st.file_uploader(
-
         "Upload CSV",
-
         type=["csv"]
-
     )
 
     if uploaded_file is not None:
@@ -1776,24 +1784,17 @@ with tab2:
             )
 
             st.write(
-                "Uploaded data:",
-                batch_df.shape
+                f"Uploaded {len(batch_df):,} applicants."
             )
 
             st.dataframe(
-
                 batch_df.head(),
-
                 use_container_width=True
-
             )
 
             if st.button(
-
                 "Run Batch Assessment",
-
                 type="primary"
-
             ):
 
                 with st.spinner(
@@ -1804,9 +1805,7 @@ with tab2:
                         batch_df.copy()
                     )
 
-                    if "TARGET" in (
-                        batch_input.columns
-                    ):
+                    if "TARGET" in batch_input.columns:
 
                         batch_input = (
                             batch_input.drop(
@@ -1814,27 +1813,21 @@ with tab2:
                             )
                         )
 
-                    if "SK_ID_CURR" in (
-                        batch_input.columns
-                    ):
+                    if "SK_ID_CURR" in batch_input.columns:
 
                         applicant_ids = (
                             batch_input[
                                 "SK_ID_CURR"
-                            ]
-                            .copy()
+                            ].copy()
                         )
 
                     else:
 
                         applicant_ids = pd.Series(
-
                             range(
                                 len(batch_input)
                             ),
-
                             name="SK_ID_CURR"
-
                         )
 
                     X_batch = (
@@ -1843,32 +1836,45 @@ with tab2:
                         )
                     )
 
-                    probabilities = (
-
+                    raw_probabilities = (
                         final_model
                         .predict_proba(
                             X_batch
                         )[:, 1]
+                    )
 
+                    probabilities = (
+                        final_calibrator
+                        .predict(
+                            raw_probabilities
+                        )
+                    )
+
+                    probabilities = np.clip(
+                        probabilities,
+                        0.0,
+                        1.0
                     )
 
                     predictions = (
-
                         probabilities
                         >= final_threshold
-
                     ).astype(int)
 
                     results = pd.DataFrame({
 
-                        "SK_ID_CURR":
+                        "Applicant ID":
                             applicant_ids.values,
 
-                        "Default_Probability":
+                        "Estimated Default Probability":
                             probabilities,
 
-                        "Prediction":
-                            predictions
+                        "Risk Classification":
+                            np.where(
+                                predictions == 1,
+                                "Higher Risk",
+                                "Lower Risk"
+                            )
 
                     })
 
@@ -1876,55 +1882,97 @@ with tab2:
                     "Batch assessment completed successfully."
                 )
 
-                st.dataframe(
-
-                    results,
-
-                    use_container_width=True
-
+                display_results = (
+                    results.copy()
                 )
+
+                display_results[
+                    "Estimated Default Probability"
+                ] = (
+
+                    display_results[
+                        "Estimated Default Probability"
+                    ]
+
+                    * 100
+
+                ).round(2).astype(str) + "%"
+
+                st.dataframe(
+                    display_results,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                higher_risk_count = int(
+                    predictions.sum()
+                )
+
+                lower_risk_count = (
+                    len(predictions)
+                    - higher_risk_count
+                )
+
+                st.subheader(
+                    "Assessment Summary"
+                )
+
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+
+                    st.metric(
+                        "Applicants Assessed",
+                        f"{len(results):,}"
+                    )
+
+                with col2:
+
+                    st.metric(
+                        "Higher Risk",
+                        f"{higher_risk_count:,}"
+                    )
+
+                with col3:
+
+                    st.metric(
+                        "Lower Risk",
+                        f"{lower_risk_count:,}"
+                    )
 
                 csv = (
                     results
-                    .to_csv(index=False)
+                    .to_csv(
+                        index=False
+                    )
                     .encode("utf-8")
                 )
 
                 st.download_button(
-
-                    "Download Predictions",
-
+                    "Download Assessment Results",
                     data=csv,
-
-                    file_name=
-                        "credit_risk_predictions.csv",
-
+                    file_name="credit_risk_predictions.csv",
                     mime="text/csv",
-
                     use_container_width=True
-
                 )
 
-        except Exception as e:
+        except Exception as batch_error:
 
             st.error(
-                "The uploaded file could not be processed."
+                "The uploaded file could not be processed. "
+                "Please check that the CSV contains the required "
+                "applicant information."
             )
 
-            st.exception(e)
+            st.caption(
+                f"Error: {batch_error}"
+            )
 
 
-# ============================================================
-# FOOTER
-# ============================================================
+# Footer
 
 st.divider()
 
 st.caption(
-
-    "Credit Risk Modelling Project • "
-    "Tuned LightGBM • "
-    f"{len(training_columns)} model features • "
-    f"Decision threshold: {final_threshold:.2f}"
-
+    "Credit Risk Assessment • Machine Learning Decision Support"
 )
