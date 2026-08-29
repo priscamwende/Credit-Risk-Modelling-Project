@@ -169,4 +169,110 @@ The final applicant-level datasets were saved as:
 These datasets combined the main application information with historical credit, loan, credit-card, POS/Cash, previous-application, and installment-payment behaviour and were used as the foundation for the subsequent data cleaning and feature engineering stages.
 
 
+# Notebook 2 _ Exploratory Data Analysis and Data Cleaning
+
+In this notebook I focused on understanding the structure, quality, distribution, and predictive characteristics of the applicant-level datasets produced in Notebook 1. The analysis covered missing values, data anomalies, outliers, feature relationships, distributions, constant features, and class imbalance before model development.
+
+#### 1. Dataset Overview
+
+The processed datasets were loaded from Notebook 1:
+
+- train_final.csv
+- test_final.csv
+
+The initial datasets contained:
+
+- Training: **307,511 rows × 617 columns**
+- Testing: **48,744 rows × 616 columns**
+
+The difference of one column is due to ***TARGET***, which is available only in the training data.
+
+No duplicate rows were found in the training dataset.
+
+#### 2. Target Distribution
+
+The target variable was highly imbalanced:
+
+- **91.93%** non-defaulters (*TARGET = 0*)
+- **8.07%** defaulters (*TARGET = 1*)
+
+This imbalance was an important consideration for model development and evaluation because a model could achieve high overall accuracy while performing poorly at identifying actual defaulters.
+<img width="610" height="469" alt="image" src="https://github.com/user-attachments/assets/830d0fb4-e054-4eed-8d6f-ed236d30c57f" />
+
+
+#### 3. Missing Value Analysis and Treatment
+
+Missing-value analysis showed that missing data was widespread:
+
+- Training: **562 of 617 columns** contained missing values
+- Testing: **559 of 616 columns** contained missing values
+
+Different imputation strategies were used depending on the meaning of the feature.
+
+- Count, sum, and unique-count features were generally filled with **0**, where missingness represented no recorded historical activity.
+- Day-based and other continuous numerical features were filled using the **median**.
+- Categorical variables were filled with a *"Missing"* category.
+- For numerical features with more than **70% missing values**, additional *_WAS_MISSING* indicators were created to preserve information about the original missingness.
+
+The imputation strategy was applied consistently to both training and testing data, with the median values learned from the training data.
+
+After treatment, both datasets contained **zero remaining missing values**.
+
+#### 4. Data Anomaly Detection
+
+Anomaly checks identified the known *365243* placeholder in *DAYS_EMPLOYED*. This value represents unavailable employment information rather than a genuine employment duration.
+
+A binary feature, *DAYS_EMPLOYED_ANOM*, was created to preserve this information. The placeholder was then replaced with *NaN* and the resulting missing value was filled using the median of valid *DAYS_EMPLOYED* values.
+
+This prevented the placeholder from being treated as a real numerical value while retaining information about its occurrence.
+<img width="599" height="434" alt="image" src="https://github.com/user-attachments/assets/d98bcbf2-6b65-401d-91a9-025b754d4531" />
+
+#### 5. Outlier Analysis
+
+Outliers were examined using the **Interquartile Range (IQR)** method.
+
+The analysis identified several features with substantial numbers of extreme observations, particularly property-related variables and aggregated installment-payment features.
+
+Rather than automatically removing all detected outliers, the analysis was used to understand the distributions and determine whether extreme values represented genuine observations or potential data-quality issues.
+<img width="1790" height="789" alt="image" src="https://github.com/user-attachments/assets/adbcfd0a-3262-4eb5-ad55-7d1fde174913" />
+
+
+## 6. Feature Distribution Analysis
+
+Key numerical features were examined using descriptive statistics, histograms, and skewness analysis.
+
+Most financial variables were positively skewed. In particular:
+
+- *AMT_INCOME_TOTAL* was extremely right-skewed.
+- *AMT_CREDIT*, *AMT_ANNUITY*, and *AMT_GOODS_PRICE* were moderately right-skewed.
+- *CNT_CHILDREN* was also positively skewed.
+- *DAYS_BIRTH* was comparatively close to symmetric.
+
+These distributions were considered when determining appropriate preprocessing and modelling strategies.
+
+#### 7. Correlation Analysis
+
+Feature correlations with ***TARGET*** were examined to identify variables associated with loan default.
+
+The strongest negative correlations included:
+
+- ***EXT_SOURCE_2***: *-0.1603*
+- ***EXT_SOURCE_3***: *-0.1559*
+- ***EXT_SOURCE_1***: *-0.0989*
+
+Positive relationships included features related to recent repayment behaviour and previous application outcomes, such as installment late-payment rates and previous application refusal rates.
+
+The correlations were generally modest, indicating that default risk is influenced by multiple factors rather than a single feature.
+
+#### 8. Constant Feature Removal
+
+Constant features were identified because they provide no variation and therefore no useful information for model learning.
+
+One constant feature was found:***PREV_NAME_GOODS_CATEGORY_HOUSE CONSTRUCTION_MEAN***
+
+It was removed from both training and testing datasets.
+
+
+The cleaned datasets provided the foundation for the subsequent feature engineering, model development, and evaluation stages.
+
 INCOMPLETE
