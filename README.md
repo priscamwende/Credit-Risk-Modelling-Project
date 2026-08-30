@@ -169,7 +169,7 @@ The final applicant-level datasets were saved as:
 These datasets combined the main application information with historical credit, loan, credit-card, POS/Cash, previous-application, and installment-payment behaviour and were used as the foundation for the subsequent data cleaning and feature engineering stages.
 
 
-# Notebook 2 _ Exploratory Data Analysis and Data Cleaning
+# Notebook 2 - Exploratory Data Analysis and Data Cleaning
 
 In this notebook I focused on understanding the structure, quality, distribution, and predictive characteristics of the applicant-level datasets produced in Notebook 1. The analysis covered missing values, data anomalies, outliers, feature relationships, distributions, constant features, and class imbalance before model development.
 
