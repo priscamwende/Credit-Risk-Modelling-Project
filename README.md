@@ -275,4 +275,232 @@ It was removed from both training and testing datasets.
 
 The cleaned datasets provided the foundation for the subsequent feature engineering, model development, and evaluation stages.
 
+## Notebook 3 - Feature Engineering
+
+This notebook focused on transforming the cleaned applicant-level dataset into a more informative modelling dataset by creating new features based on **financial relationships, household structure, age, employment history, external credit information, loan characteristics, social-risk indicators, and applicant contact information**.
+
+The objective was to move beyond the raw variables and create features that better represent the financial circumstances and potential credit risk of each applicant.
+
+The notebook starts with the cleaned datasets produced during the EDA and data-cleaning stage. At this point, missing values, missingness indicators, data-quality issues, and constant features had already been addressed.
+
+The cleaned datasets contained:
+
+- Training: **307,511 rows × 733 columns**
+- Testing: **48,744 rows × 732 columns**
+
+`TARGET` was separated from the training features and `SK_ID_CURR` was temporarily removed so that neither the target nor the applicant identifier would be used as an input feature during feature engineering.
+
+The initial feature set contained:
+
+- **715 numerical features**
+- **16 categorical features**
+
+#### 1. Financial Ratio Features
+
+Several features were created by combining existing financial variables into ratios.
+
+These included:
+
+- ***CREDIT_INCOME_RATIO*** - credit amount relative to annual income
+- ***ANNUITY_INCOME_RATIO*** - annual loan payment relative to income
+- ***CREDIT_GOODS_RATIO*** - credit amount relative to the value of the goods being financed
+- ***GOODS_INCOME_RATIO*** - goods price relative to income
+- ***ANNUITY_CREDIT_RATIO*** - annual annuity relative to the credit amount
+
+These ratios provide more context than absolute financial amounts alone.
+
+For example, a loan of the same size can represent very different levels of financial burden for applicants with different incomes. Ratio-based features therefore provide the model with information about **affordability, repayment burden, and borrowing behaviour**.
+
+A ***safe_divide()*** helper function was used to avoid division-by-zero problems when creating these features.
+
+#### 2. Household and Family Features
+
+The notebook created features that account for household size and family composition.
+
+These included:
+
+- *INCOME_PER_PERSON*
+- *INCOME_PER_CHILD*
+- *CREDIT_PER_PERSON*
+- *CHILDREN_RATIO*
+
+These features provide additional information about an applicant's financial resources relative to the number of people or dependants in the household.
+
+For example, total income alone does not provide the same level of information as income considered relative to family size. These engineered variables therefore provide a more contextual measure of household financial capacity.
+
+#### 3. Age and Time-Based Features
+
+Several variables in the Home Credit dataset are represented as negative numbers of days relative to the loan application date.
+
+To make these variables easier to interpret, they were converted from days into years.
+
+The following features were created:
+
+- *AGE_YEARS*
+- *EMPLOYMENT_YEARS*
+- *REGISTRATION_YEARS*
+- *ID_PUBLISH_YEARS*
+
+These transformations preserve the underlying information while making the variables easier to interpret in terms of an applicant's age, employment history, registration history, and identification-record history.
+
+#### 4. Employment and Stability Features
+
+The notebook also created relative measures of employment and registration history.
+
+These included:
+
+- *EMPLOYMENT_AGE_RATIO*
+- *REGISTRATION_AGE_RATIO*
+
+These ratios compare employment or registration duration with the applicant's age.
+
+Rather than looking only at how many years an applicant has been employed or registered, the ratios provide additional context about how significant those periods are relative to the applicant's lifetime.
+
+#### 5. External Credit Score Features
+
+The three external credit variables:
+
+- *EXT_SOURCE_1*
+- *EXT_SOURCE_2*
+- *EXT_SOURCE_3*
+
+were combined into several summary features:
+
+- *EXT_SOURCE_MEAN*
+- *EXT_SOURCE_MAX*
+- *EXT_SOURCE_MIN*
+- *EXT_SOURCE_STD*
+- *EXT_SOURCE_SUM*
+
+These features were particularly important because the exploratory analysis in Notebook 2 showed that the external credit variables had some of the strongest relationships with the target.
+
+Combining the external scores allowed the model to capture an applicant's overall external credit profile rather than relying only on the individual scores.
+
+
+#### 6. Loan Duration Feature
+
+A ***LOAN_TERM*** feature was created using the relationship between:
+
+- *AMT_CREDIT*
+- *AMT_ANNUITY*
+
+This provides an approximate measure of the repayment duration implied by the loan amount and annuity.
+
+The purpose was to give the model an additional representation of the loan's repayment structure rather than treating the credit amount and annuity independently.
+
+#### 7. Social Risk Features
+
+The Home Credit dataset contains information about observed payment problems and defaults within an applicant's social circle.
+
+Two aggregate features were created:
+
+- *TOTAL_SOCIAL_OBS*
+- *TOTAL_SOCIAL_DEF*
+
+These combine the 30-day and 60-day social-circle observations and default indicators.
+
+The purpose was to create broader measures of the applicant's social credit environment rather than using the individual 30-day and 60-day variables separately.
+
+#### 8. Contact Information Feature
+
+Several binary contact indicators were combined into:
+
+`TOTAL_CONTACT_FLAGS`
+
+This feature represents the total number of contact methods associated with an applicant, including indicators such as:
+
+- Mobile phone
+- Employer phone
+- Work phone
+- Contact mobile
+- Phone
+- Email
+
+Combining these indicators creates a compact summary of the applicant's available contact information.
+
+## 9. Engineered Feature Summary
+
+A total of **24 new features** were created.
+
+| Feature Group | Examples |
+|---|---|
+| Financial ratios | *CREDIT_INCOME_RATIO*, *ANNUITY_INCOME_RATIO*, *CREDIT_GOODS_RATIO* |
+| Household affordability | *INCOME_PER_PERSON*, *INCOME_PER_CHILD*, *CREDIT_PER_PERSON* |
+| Family composition | *CHILDREN_RATIO* |
+| Age and time | *AGE_YEARS*, *EMPLOYMENT_YEARS*, *REGISTRATION_YEARS* |
+| Employment stability | *EMPLOYMENT_AGE_RATIO*, *REGISTRATION_AGE_RATIO* |
+| External credit | *EXT_SOURCE_MEAN*, *EXT_SOURCE_MIN*, *EXT_SOURCE_MAX*, *EXT_SOURCE_STD*, *EXT_SOURCE_SUM* |
+| Loan structure | *LOAN_TERM* |
+| Social risk | *TOTAL_SOCIAL_OBS*, *TOTAL_SOCIAL_DEF* |
+| Contact information | *TOTAL_CONTACT_FLAGS* |
+
+#### 10. Correlation Analysis of Engineered Features
+
+The newly created features were evaluated against ***TARGET*** to understand whether they provided additional linear signal for predicting loan default.
+
+The strongest negative correlations were:
+
+| Feature | Correlation with TARGET |
+|---|---:|
+| EXT_SOURCE_SUM | **-0.221** |
+| EXT_SOURCE_MEAN | **-0.221** |
+| EXT_SOURCE_MIN | **-0.193** |
+| EXT_SOURCE_MAX | **-0.174** |
+| AGE_YEARS | **-0.078** |
+| EMPLOYMENT_YEARS | **-0.063** |
+| ID_PUBLISH_YEARS | **-0.051** |
+| EMPLOYMENT_AGE_RATIO | **-0.050** |
+| REGISTRATION_YEARS | **-0.042** |
+| LOAN_TERM | **-0.032** |
+
+The strongest positive relationships included:
+
+| Feature | Correlation with TARGET |
+|---|---:|
+| EXT_SOURCE_STD | **0.078** |
+| CREDIT_GOODS_RATIO | **0.068** |
+| TOTAL_SOCIAL_DEF | **0.033** |
+| CHILDREN_RATIO | **0.021** |
+| TOTAL_CONTACT_FLAGS | **0.021** |
+| ANNUITY_INCOME_RATIO | **0.014** |
+
+The combined external-credit features produced the strongest relationships among the engineered variables. In particular, *EXT_SOURCE_SUM* and *EXT_SOURCE_MEAN* both had a correlation of approximately **-0.221** with the target.
+
+A negative correlation indicates that higher values were associated with a lower observed likelihood of default, while a positive correlation indicates a higher observed likelihood of default.
+
+However, most correlations were relatively small. This does not necessarily mean that the features are unimportant because correlation measures only a **linear relationship between an individual feature and the target**. Machine learning models can capture non-linear relationships and interactions that simple correlation analysis cannot.
+
+#### 11. Feature Engineering Validation
+
+Before saving the final datasets, several quality checks were performed.
+
+The notebook verified that:
+
+- There were **no remaining missing values**.
+- There were **no infinite numerical values**.
+- The engineered features had been successfully created.
+- Summary statistics were inspected for the newly created variables.
+
+These checks ensured that the feature-engineered datasets were suitable for the subsequent modelling stage.
+
+#### 12. Restoring Target and Applicant IDs
+
+After feature engineering and validation, the original *TARGET* and *SK_ID_CURR* columns were added back to the final datasets.
+
+The resulting datasets contained:
+
+- Training: **307,511 rows × 757 columns**
+- Testing: **48,744 rows × 756 columns**
+
+The difference of one column is due to *TARGET*, which exists only in the training dataset.
+
+## 13. Final Outputs
+
+The final feature-engineered datasets were saved in Parquet format:
+
+text
+output/
+├── train_feature_engineered.parquet
+└── test_feature_engineered.parquet
+
 INCOMPLETE
