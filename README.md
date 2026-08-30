@@ -494,13 +494,6 @@ The resulting datasets contained:
 
 The difference of one column is due to *TARGET*, which exists only in the training dataset.
 
-## 13. Final Outputs
 
-The final feature-engineered datasets were saved in Parquet format:
-
-text
-output/
-├── train_feature_engineered.parquet
-└── test_feature_engineered.parquet
 
 INCOMPLETE
