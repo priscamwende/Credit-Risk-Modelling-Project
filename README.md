@@ -494,6 +494,349 @@ The resulting datasets contained:
 
 The difference of one column is due to *TARGET*, which exists only in the training dataset.
 
+## Notebook 4 - Model Selection, Training, Calibration and Business Optimization
 
+This notebook represents the **model development and decision-making stage** of the credit risk project.
+
+Using the feature-engineered dataset produced in Notebook 3, my objective was to identify a machine learning model capable of distinguishing between customers who are likely to default and those who are unlikely to default.
+
+The modelling process went beyond simply selecting the model with the highest accuracy. Because loan default is a highly imbalanced classification problem and the cost of missing a genuine defaulter can be significantly higher than incorrectly flagging a good applicant, the modelling process considered:
+
+- Model discrimination
+- Class imbalance
+- Cross-validation performance
+- Hyperparameter tuning
+- Precision and recall
+- F1-score
+- Probability calibration
+- Business-cost-sensitive threshold selection
+- Final model packaging and saving
+
+The final selected model was a **Tuned Class-Weighted CatBoost classifier**, calibrated using **Isotonic Regression**, with a **decision threshold of 0.15** under the assumed business cost structure.
+
+#### 1. Modelling Dataset
+
+The notebook begins by loading the feature-engineered datasets created in Notebook 3.
+
+The datasets contained:
+
+- **Training:** 307,511 rows × 757 columns
+- **Testing:** 48,744 rows × 756 columns
+
+The *TARGET* variable was separated from the training features, while *SK_ID_CURR* was excluded from model inputs because it is an applicant identifier rather than a predictive feature.
+
+The resulting feature set contained a large mixture of numerical and encoded categorical information derived from the original application data and historical financial records.
+
+#### 2. Train-Validation Split
+
+The training data was divided into training and validation subsets using a **stratified train-validation split**.
+
+Stratification was important because only approximately 8% of applicants were defaulters. Maintaining a similar class distribution across the training and validation datasets provided a more reliable evaluation of model performance.
+
+The validation dataset was kept separate from model fitting so that it could be used to evaluate how well the models performed on previously unseen observations.
+
+#### 3. Baseline Model Development
+
+Several machine learning algorithms were initially evaluated to establish baseline performance.
+
+The models included:
+
+- Logistic Regression
+- Random Forest
+- XGBoost
+- LightGBM
+- CatBoost
+
+These models were selected because they provide a useful combination of:
+
+- Linear modelling
+- Bagging-based tree models
+- Gradient boosting
+- High-performance categorical-feature modelling
+
+The initial comparison used metrics including:
+
+- Accuracy
+- Precision
+- Recall
+- F1-score
+- ROC-AUC
+
+Because of the strong class imbalance, **ROC-AUC was given more importance than accuracy** when comparing the models.
+
+#### 4. Baseline Model Results
+
+The initial validation comparison produced the following results:
+
+| Model | Accuracy | Precision | Recall | F1-score | ROC-AUC |
+|---|---:|---:|---:|---:|---:|
+| LightGBM | 91.99% | 58.53% | 2.56% | 4.90% | **0.7823** |
+| CatBoost | 92.02% | **65.96%** | 2.50% | 4.81% | 0.7803 |
+| Logistic Regression | 92.01% | 56.76% | 4.23% | 7.87% | 0.7786 |
+| XGBoost | 91.88% | 48.13% | **6.75%** | **11.84%** | 0.7739 |
+| Random Forest | 91.93% | 50.77% | 0.66% | 1.31% | 0.7352 |
+
+LightGBM achieved the highest baseline ROC-AUC of **0.7823**, while CatBoost followed closely with **0.7803**.
+
+However, the very low recall values demonstrated an important problem: using the default classification threshold caused the models to identify very few actual defaulters.
+
+This showed why **accuracy alone was not an appropriate model-selection criterion** for this problem.
+
+#### 5. Handling Class Imbalance
+
+The dataset contains substantially more non-defaulters than defaulters.
+
+To investigate the effect of class imbalance, **SMOTE (Synthetic Minority Over-sampling Technique)** was tested.
+
+SMOTE was used to generate additional synthetic observations for the minority class.
+
+Importantly, SMOTE was incorporated into modelling pipelines so that oversampling was applied to the training data rather than the validation data.
+
+This helped prevent information from the validation set from influencing the model training process.
+
+#### 6. Five-Fold Stratified Cross-Validation
+
+After the initial model comparison, the strongest candidate models were evaluated using **five-fold Stratified Cross-Validation**.
+
+The purpose was to determine whether the initial results were stable across different subsets of the data.
+
+The models were evaluated using ROC-AUC.
+
+| Model | Mean CV ROC-AUC | Standard Deviation |
+|---|---:|---:|
+| **LightGBM** | **0.7770** | 0.0026 |
+| Logistic Regression | 0.7751 | 0.0025 |
+| CatBoost | 0.7734 | 0.0027 |
+| XGBoost | 0.7655 | 0.0025 |
+
+LightGBM achieved the highest mean cross-validation ROC-AUC of **0.7770**.
+
+However, the differences between LightGBM, Logistic Regression and CatBoost were relatively small.
+
+As a result, Logistic Regression and CatBoost were retained as candidates for further investigation, while XGBoost was excluded from subsequent tuning because it produced the lowest cross-validation ROC-AUC.
+
+The cross-validation results also demonstrated that model selection should not depend on a single train-validation split.
+
+#### 7. SMOTE versus Class Weighting
+
+Two approaches for addressing class imbalance were considered:
+
+### SMOTE
+
+SMOTE creates synthetic examples of the minority class.
+
+### Class Weighting
+
+Class weighting increases the penalty associated with misclassifying observations from the minority class.
+
+For the later tuning stage, **class weighting was preferred** because it avoids creating synthetic observations and allows the models to learn directly from the original observations while placing greater importance on defaulters.
+
+This was particularly useful for the tree-based models used later in the project.
+
+#### 8. Hyperparameter Tuning
+
+Hyperparameter tuning was performed on the strongest candidate models.
+
+**RandomizedSearchCV** was used to search through combinations of model parameters.
+
+This approach was selected instead of testing every possible combination because the dataset contains hundreds of features and the computational cost of exhaustive grid searches can become very high.
+
+The main models tuned were:
+
+- LightGBM
+- CatBoost
+- Logistic Regression
+
+The tuning process focused on parameters that influence model complexity, learning behaviour and class imbalance.
+
+#### 9. Tuned LightGBM
+
+The best LightGBM configuration achieved a cross-validation ROC-AUC of:
+
+**0.7836**
+
+The selected parameters included:
+
+- `n_estimators = 300`
+- `learning_rate = 0.1`
+- `num_leaves = 15`
+- `max_depth = 10`
+- `min_child_samples = 50`
+- `colsample_bytree = 0.8`
+
+LightGBM remained one of the strongest models and demonstrated particularly strong recall when class weighting was applied.
+
+#### 10. Tuned CatBoost
+
+CatBoost achieved a slightly higher cross-validation ROC-AUC:
+
+**0.7839**
+
+The best configuration included:
+
+- `iterations = 300`
+- `learning_rate = 0.05`
+- `depth = 8`
+- `l2_leaf_reg = 7`
+- `class_weights = [1, 5]`
+
+CatBoost produced the strongest overall balance between precision and recall among the tuned models.
+
+Its cross-validation ROC-AUC of **0.7839** was also slightly higher than the tuned LightGBM result of **0.7836**.
+
+#### 11. Tuned Model Comparison
+
+After tuning, the models were compared using both discrimination and classification metrics.
+
+The results showed an important trade-off.
+
+**LightGBM** produced substantially higher recall, meaning it identified more of the actual defaulters.
+
+However, this came at the cost of lower precision and accuracy.
+
+**CatBoost** achieved a better balance between precision and recall and produced the highest F1-score among the tuned models.
+
+This was particularly important because the objective was not simply to maximize the number of detected defaulters.
+
+The model also needed to avoid generating an unnecessarily large number of false alarms.
+
+The notebook therefore moved beyond model performance at the default threshold and investigated **probability calibration and business-cost optimization**.
+
+#### 12. Probability Calibration
+
+Machine learning models produce probability estimates, but those probabilities are not always reliable.
+
+For example, a model predicting a default probability of 0.80 should ideally be correct approximately 80% of the time for observations receiving that probability.
+
+To evaluate and improve probability reliability, calibration was performed on:
+
+- Tuned Logistic Regression
+- Tuned LightGBM
+- Tuned CatBoost
+
+Two calibration approaches were compared:
+
+- **Sigmoid calibration**
+- **Isotonic calibration**
+
+The **Brier Score** was used as the main measure of probability calibration.
+
+A lower Brier Score indicates better-calibrated probabilities.
+
+#### 13. Calibration Results
+
+Before calibration:
+
+| Model | Brier Score |
+|---|---:|
+| Logistic Regression | 0.0808 |
+| CatBoost | 0.1009 |
+| LightGBM | 0.1718 |
+
+After calibration, the probability estimates improved substantially.
+
+The best calibrated results were:
+
+| Model | Calibration Method | Brier Score | ROC-AUC |
+|---|---|---:|---:|
+| **Tuned CatBoost** | **Isotonic** | **0.0651** | **0.7968** |
+| Tuned LightGBM | Isotonic | 0.0663 | 0.7812 |
+| Tuned Logistic Regression | Isotonic | 0.0670 | 0.7753 |
+
+Tuned CatBoost with Isotonic calibration achieved the **lowest Brier Score and highest calibrated ROC-AUC** among the evaluated models.
+
+This made it the strongest candidate for the final credit-risk system.
+
+#### 14. Why a 0.50 Threshold Was Not Used
+
+A major finding from the project was that the default classification threshold of **0.50** was inappropriate for this credit-risk problem.
+
+At a threshold of 0.50, the calibrated models identified very few actual defaulters.
+
+This occurred because the dataset is highly imbalanced and because the probability estimates represent relatively low default probabilities for most applicants.
+
+Therefore, simply asking whether:
+
+Predicted Probability >= 0.50
+
+#### 15. Business Cost Framework
+
+The project introduced a simple business-cost framework to make the threshold selection more realistic.
+
+The assumptions were:
+
+- **False Positive Cost = 1**
+- **False Negative Cost = 5**
+
+This means that incorrectly flagging a low-risk customer was considered to have a cost of 1, while failing to identify a genuine defaulter was considered five times more costly.
+
+The total business cost was calculated as:
+
+Total Cost = (False Positives × 1) + (False Negatives × 5)
+
+#### 16. Cost-Sensitive Threshold Optimization
+
+Multiple probability thresholds were tested to determine how the classification decision changed as the threshold was adjusted.
+
+The analysis showed that lowering the threshold increased recall but also increased the number of false positives.
+
+This created the expected trade-off:
+
+- **Higher threshold** → fewer false positives but more missed defaulters.
+- **Lower threshold** → more detected defaulters but more false positives.
+
+The objective was to identify the threshold that minimized the assumed total business cost.
+
+Rather than automatically using the standard **0.50 threshold**, the project selected the threshold based on the financial consequences of false-positive and false-negative predictions.
+
+## 17. Final Cost-Sensitive Comparison
+
+The best results from the three calibrated models were:
+
+| Model | Best Threshold | Precision | Recall | F1-score | False Positives | False Negatives | Total Cost |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **Tuned Class-Weighted CatBoost** | **0.15** | **28.11%** | **44.81%** | **34.55%** | 1,138 | 548 | **3,878** |
+| Tuned Class-Weighted LightGBM | 0.20 | 33.02% | 31.92% | 32.46% | 643 | 676 | 4,023 |
+| Tuned Class-Weighted Logistic Regression | 0.15 | 25.17% | 43.71% | 31.95% | 1,290 | 559 | 4,085 |
+
+Based on the assumed cost structure, **Tuned Class-Weighted CatBoost achieved the lowest total business cost of 3,878**.
+
+It also achieved:
+
+- **44.81% recall**
+- **28.11% precision**
+- **34.55% F1-score**
+- **548 false negatives**
+- **1,138 false positives**
+
+Therefore, **CatBoost was selected as the final model**.
+
+## 18. Final Model Selection
+
+The final model was selected based on a combination of:
+
+1. Strong discrimination
+2. Good probability calibration
+3. Competitive precision
+4. Strong recall
+5. High F1-score
+6. Lowest assumed business cost
+7. Practical suitability for a credit-risk decision-support system
+
+The final configuration was:
+
+| Component | Final Selection |
+|---|---|
+| Model | **Tuned Class-Weighted CatBoost** |
+| Calibration | **Isotonic Regression** |
+| Decision Threshold | **0.15** |
+| False Positive Cost | **1** |
+| False Negative Cost | **5** |
+| Total Business Cost | **3,878** |
+| Precision | **28.11%** |
+| Recall | **44.81%** |
+| F1-score | **34.55%** |
+
+The model was therefore selected based on **business cost rather than accuracy alone**.
 
 INCOMPLETE
