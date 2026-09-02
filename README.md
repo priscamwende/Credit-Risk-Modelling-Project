@@ -839,4 +839,293 @@ The final configuration was:
 
 The model was therefore selected based on **business cost rather than accuracy alone**.
 
-INCOMPLETE
+
+## Notebook 5 - Final Model Evaluation, Interpretation and Deployment
+
+This notebook represents the **final evaluation and validation stage** of the credit risk project.
+
+The purpose of this stage was to evaluate the final selected model on unseen validation data, assess the reliability of its predicted probabilities, apply the business-optimized decision threshold, analyse classification errors, calculate the final business cost, interpret the model using SHAP, and prepare the model for use in a credit-risk application.
+
+The final model package contains the trained **Class-Weighted CatBoost model**, **Isotonic calibration model**, selected decision threshold, training feature columns, categorical-column information, and the top organization categories required for consistent predictions.
+
+### 1. Loading the Final Model Package
+
+The saved final model package was loaded from: **output/final_chosen_credit_risk_model.pkl**
+
+The package contains:
+
+* Final Class-Weighted CatBoost model
+* Isotonic calibration model
+* Decision threshold of **0.15**
+* Training feature columns
+* Categorical column information
+* Top 15 organization types
+
+The saved model expects **842 training features** and contains **16 categorical columns** used during preprocessing.
+
+The notebook also verified that the saved model package loaded successfully and that the final threshold was **0.15**.
+
+#### 2. Preparing the Evaluation Data
+
+The feature-engineered training dataset from the previous stage was loaded and separated into:
+
+* **Features (`X`)**
+* **Target (`y`)**
+
+*SK_ID_CURR* was removed from the model inputs because it is an applicant identifier rather than a predictive feature.
+
+The categorical variables were identified and the *ORGANIZATION_TYPE* variable was grouped into its **15 most common categories**, with the remaining categories grouped into `"Other"`.
+
+I then One hot encoded the categorical variables. After encoding, the evaluation dataset contained:
+
+**307,511 observations × 842 features**
+
+#### 3. Feature Consistency Validation
+
+Before making predictions,  I compared the evaluation features with the features used to train final model. 
+The validation confirmed:
+
+* Model expected: **842 columns**
+* Evaluation dataset: **842 columns**
+* Missing columns: **0**
+* Extra columns: **0**
+* Exact feature match: **True**
+
+This step was important because a mismatch between the training and evaluation feature structure could produce incorrect model predictions.
+
+#### 4. Train-Validation Split
+
+I divided thr  data  into training and validation sets using a **stratified 80/20 split**.
+
+The resulting datasets were:
+
+| Dataset    |    Rows | Features |
+| ---------- | ------: | -------: |
+| Training   | 246,008 |      842 |
+| Validation |  61,503 |      842 |
+
+I used Stratification to preserve the proportion of defaulters and non-defaulters in both datasets.
+
+I checked the  validation data to ensure that:
+
+* There were **0 missing values**
+* There were **0 non-numeric columns**
+* All **842 expected model features** were present
+
+#### 5. Raw Probability Predictions
+
+The final CatBoost model generated a probability of default for each of the **61,503 validation customers**.
+
+The raw probabilities ranged from approximately:
+
+* **Minimum:** 1.04%
+* **Maximum:** 92.96%
+* **Average:** 24.86%
+
+The purpose of generating probabilities was to estimate **how likely each applicant was to default**, rather than producing only a simple default/non-default classification.
+
+These raw probabilities were not immediately used for the final lending decision because probability calibration was applied first.
+
+#### 6. Isotonic Probability Calibration
+
+The raw CatBoost probabilities were passed through the selected **Isotonic Calibration** model.
+
+The purpose of calibration was to make the predicted probabilities more closely aligned with the actual observed default rate.
+
+After calibration:
+
+* Minimum probability: **0%**
+* Maximum probability: **100%**
+* Mean calibrated probability: **8.06%**
+
+The average probability decreased from approximately **24.86% before calibration to 8.06% after calibration**.
+
+The calibrated average was much closer to the dataset's actual default rate of approximately **8.07%**.
+
+This suggests that the raw CatBoost model was overestimating default probabilities and that the calibration step substantially improved the reliability of the probability estimates.
+
+#### 7. Evaluation of Calibrated Probabilities
+
+The calibrated probabilities were evaluated using:
+
+* **Brier Score**
+* **ROC-AUC**
+
+The final results were:
+
+| Metric      |     Result |
+| ----------- | ---------: |
+| Brier Score | **0.0655** |
+| ROC-AUC     | **0.7880** |
+
+The Brier Score of **0.0655** indicates reasonably reliable probability estimates, with lower values representing better calibration.
+
+The ROC-AUC of **0.7880** shows that the model retained good ability to distinguish between customers who defaulted and those who did not after calibration.
+
+Therefore, calibration improved probability reliability while maintaining useful discriminatory performance.
+
+#### 8. Applying the Final Decision Threshold
+
+I converted the  final calibrated probabilities  into classification decisions using the selected business-optimized threshold of:
+
+**0.15**
+
+Applicants with a calibrated probability of default of **15% or higher** were classified as high risk.
+
+The validation predictions were:
+
+| Prediction |  Customers | Percentage |
+| ---------- | ---------: | ---------: |
+| Lower Risk |     53,611 |     87.17% |
+| High Risk  |      7,892 |     12.83% |
+| **Total**  | **61,503** |   **100%** |
+
+This demonstrates how the calibrated probabilities were converted into actionable risk classifications.
+
+#### 9. Final Confusion Matrix
+
+The final model was evaluated using the confusion matrix at the **0.15 decision threshold**.
+
+|                          | Predicted Non-Defaulter | Predicted Defaulter |
+| ------------------------ | ----------------------: | ------------------: |
+| **Actual Non-Defaulter** |              **50,869** |           **5,669** |
+| **Actual Defaulter**     |               **2,742** |           **2,223** |
+
+The results can be interpreted as follows:
+
+* **True Negatives (50,869):** Customers who did not default and were correctly classified as lower risk.
+* **False Positives (5,669):** Customers who did not default but were classified as high risk.
+* **False Negatives (2,742):** Customers who defaulted but were classified as lower risk.
+* **True Positives (2,223):** Customers who defaulted and were correctly classified as high risk.
+
+The confusion matrix demonstrates the trade-off created by the 0.15 threshold.
+
+The model identifies a substantial number of actual defaulters, but it also produces false positives. At the same time, some actual defaulters remain undetected.
+
+#### 10. Final Validation Metrics
+
+At the selected threshold of **0.15**, the final model achieved:
+
+| Metric      |     Result |
+| ----------- | ---------: |
+| Accuracy    | **86.32%** |
+| Precision   | **28.17%** |
+| Recall      | **44.77%** |
+| F1-Score    | **34.58%** |
+| ROC-AUC     | **0.7880** |
+| Brier Score | **0.0655** |
+
+The model achieved a recall of **44.77%**, meaning that it identified approximately 45% of the actual defaulters in the validation dataset.
+
+The precision of **28.17%** means that approximately 28% of the applicants classified as high risk were actual defaulters.
+
+The relatively low precision is partly a result of the lower decision threshold, which was intentionally selected to identify more potential defaulters.
+
+#### 11. Final Business Cost
+
+The project assumed that the consequences of the two types of classification errors were different:
+
+* **False Positive Cost = 1**
+* **False Negative Cost = 5**
+
+The final business cost was calculated as:
+
+**Total Business Cost = (False Positives × 1) + (False Negatives × 5)**
+
+Using the final confusion matrix:
+
+**Total Business Cost = (5,669 × 1) + (2,742 × 5)**
+
+**Total Business Cost = 19,379**
+
+The higher cost assigned to false negatives reflects the assumption that failing to identify an actual defaulter is more costly to the lender than incorrectly flagging a non-defaulter.
+
+This business-cost framework was therefore used alongside statistical performance metrics when evaluating the final model.
+
+#### 12. SHAP Model Interpretation
+
+ I used SHAP  to understand which features contributed most strongly to the final CatBoost model's predictions.
+
+The analysis helped identify the variables that had the greatest influence on predicted credit risk.
+
+Important features included variables related to:
+
+* External credit information
+* Previous repayment behaviour
+* Installment payment lateness
+* Loan and credit structure
+* Previous loan repayment timing
+* Loan affordability
+
+Examples of important features included:
+
+* *EXT_SOURCE_MEAN*
+* *EXT_SOURCE_SU*`
+* *INSTAL_RECENCY_WEIGHTED_LATE_RATE*
+* *CREDIT_GOODS_RATIO*
+* *PREV_DAYS_LAST_DUE_1ST_VERSION_MAX*
+* *AMT_ANNUITY*
+
+The SHAP analysis provides an explanation of how the model uses these variables when making predictions. These relationships should be interpreted as **model associations rather than causal relationships**.
+
+#### 13. Final Model Package
+
+After evaluation, the final model package was retained with the components required to reproduce predictions consistently.
+
+The final package includes:
+
+| Component                   | Final Selection             |
+| --------------------------- | --------------------------- |
+| Model                       | **Class-Weighted CatBoost** |
+| Calibration                 | **Isotonic Regression**     |
+| Decision Threshold          | **0.15**                    |
+| Training Features           | **842**                     |
+| Categorical Columns         | **16**                      |
+| Top Organization Categories | **15**                      |
+
+The model was saved as:
+
+*final_chosen_credit_risk_model.pkl*
+
+This package provides the model and supporting preprocessing information required for deployment.
+
+### 14. Deployment Readiness
+
+The final model package was prepared for use in an interactive credit-risk application.
+
+The deployment workflow uses the saved model package to:
+
+1. Receive applicant information.
+2. Apply the required preprocessing.
+3. Align the applicant features with the model's **842 training columns**.
+4. Generate a raw probability of default.
+5. Apply Isotonic calibration.
+6. Compare the calibrated probability with the **0.15 threshold**.
+7. Produce a final risk classification.
+
+This allows the machine learning model to move beyond notebook-based analysis into a practical decision-support application.
+
+#### 15. Final Project Outcome
+
+The completed project developed an end-to-end credit-risk modelling workflow beginning with raw relational financial data and ending with a calibrated and deployable machine learning model.
+
+The final workflow includes:
+
+**Data Aggregation → Data Cleaning → Feature Engineering → Model Comparison → Class Imbalance Handling → Hyperparameter Tuning → Probability Calibration → Threshold Optimization → Model Evaluation → SHAP Interpretation → Model Packaging → Deployment**
+
+The final **Class-Weighted CatBoost model with Isotonic calibration** achieved a **ROC-AUC of 0.7880** and a **Brier Score of 0.0655** on the validation data.
+
+Using a business-optimized threshold of **0.15**, the model achieved:
+
+* **86.32% Accuracy**
+* **28.17% Precision**
+* **44.77% Recall**
+* **34.58% F1-Score**
+* **0.7880 ROC-AUC**
+* **0.0655 Brier Score**
+* **19,379 Total Business Cost**
+
+The project demonstrates that credit-risk modelling should not focus on accuracy alone. A practical lending model must also consider **probability reliability, class imbalance, false-positive and false-negative costs, model interpretability, and deployment requirements**.
+
+The final model is therefore intended as a **decision-support system**, helping lenders identify potentially higher-risk applicants while allowing human decision-makers to consider the model's predictions alongside other relevant credit information and business policies.
+
