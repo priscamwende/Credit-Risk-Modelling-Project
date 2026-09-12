@@ -594,9 +594,9 @@ Importantly, SMOTE was incorporated into modelling pipelines so that oversamplin
 
 This helped prevent information from the validation set from influencing the model training process.
 
-#### 6. Five-Fold Stratified Cross-Validation
+#### 6. Three-Fold Stratified Cross-Validation
 
-After the initial model comparison, the strongest candidate models were evaluated using **five-fold Stratified Cross-Validation**.
+After the initial model comparison, the strongest candidate models were evaluated using **three-fold Stratified Cross-Validation**.
 
 The purpose was to determine whether the initial results were stable across different subsets of the data.
 
